@@ -21,14 +21,14 @@ const WEBVIEW_SHORTCUTS = new Set([
   'ctrl+Equal', 'ctrl+NumpadAdd', 'ctrl+Minus', 'ctrl+NumpadSubtract',
   'ctrl+Digit0', 'ctrl+Numpad0',
   'alt+ArrowLeft', 'alt+ArrowRight',
-  'F3', 'F5', 'F11', 'F12', 'Escape'
+  'F3', 'F5', 'F11', 'Escape'
 ])
 
 // ── Config persistante
 const configPath = path.join(app.getPath('userData'), 'config.json')
 let config = { adblock: true }
 try { Object.assign(config, JSON.parse(fs.readFileSync(configPath, 'utf-8'))) } catch {}
-function saveConfig() { try { fs.writeFileSync(configPath, JSON.stringify(config)) } catch {} }
+function saveConfig() { try { fs.writeFileSync(configPath, JSON.stringify(config)) } catch (e) { console.error('saveConfig error', e) } }
 
 // ── Adblocker
 const blocklistPath = path.join(app.getPath('userData'), 'blocklist_v2.txt')
@@ -55,7 +55,7 @@ async function refreshBlocklist() {
     const text = await res.text()
     fs.writeFileSync(blocklistPath, text, 'utf-8')
     parseBlocklist(text)
-  } catch {}
+  } catch (e) { console.error('refreshBlocklist error', e) }
 }
 
 function initBlocklist() {
@@ -64,7 +64,7 @@ function initBlocklist() {
       parseBlocklist(fs.readFileSync(blocklistPath, 'utf-8'))
       if (Date.now() - fs.statSync(blocklistPath).mtimeMs > BLOCKLIST_TTL) refreshBlocklist()
       return
-    } catch {}
+    } catch (e) { console.error('initBlocklist error', e) }
   }
   refreshBlocklist()
 }
@@ -176,6 +176,17 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => mainWindow.show())
   mainWindow.on('enter-full-screen', () => mainWindow.webContents.send('fullscreen-change', true))
   mainWindow.on('leave-full-screen',  () => mainWindow.webContents.send('fullscreen-change', false))
+
+  // SEC-006 — empêche la BrowserWindow principale de naviguer vers des URLs externes
+  mainWindow.webContents.on('will-navigate', (e) => e.preventDefault())
+
+  // SEC-009 — valide les webviews attachées
+  mainWindow.webContents.on('will-attach-webview', (e, webPreferences) => {
+    delete webPreferences.preload
+    delete webPreferences.preloadURL
+    webPreferences.nodeIntegration = false
+    webPreferences.contextIsolation = true
+  })
 }
 
 app.whenReady().then(async () => {
@@ -210,7 +221,7 @@ app.whenReady().then(async () => {
   session.defaultSession.on('will-download', (_, item) => {
     const id = Date.now()
     const dlDir = config.downloadPath || app.getPath('downloads')
-    item.setSavePath(path.join(dlDir, item.getFilename()))
+    item.setSavePath(path.join(dlDir, path.basename(item.getFilename())))
     downloadItems.set(id, item)
     mainWindow.webContents.send('dl-start', { id, filename: item.getFilename(), total: item.getTotalBytes() })
     item.on('updated', (_, state) => {
@@ -288,7 +299,14 @@ ipcMain.on('window-minimize',    () => mainWindow.minimize())
 ipcMain.on('window-maximize',    () => { mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize() })
 ipcMain.on('window-close',       () => mainWindow.close())
 ipcMain.on('toggle-fullscreen',  () => mainWindow.setFullScreen(!mainWindow.isFullScreen()))
-ipcMain.on('open-file',          (_, p) => shell.showItemInFolder(p))
+ipcMain.on('open-file', (_, p) => {
+  const dlDir = path.resolve(config.downloadPath || app.getPath('downloads'))
+  const userData = path.resolve(app.getPath('userData'))
+  const resolved = path.resolve(p)
+  if (!resolved.startsWith(dlDir + path.sep) && !resolved.startsWith(userData + path.sep) &&
+      resolved !== dlDir && resolved !== userData) return
+  shell.showItemInFolder(resolved)
+})
 ipcMain.on('open-dl-folder',     () => shell.openPath(config.downloadPath || app.getPath('downloads')))
 ipcMain.on('focus-webview',      (_, id) => { const wc = webContents.fromId(id); if (wc) wc.focus() })
 ipcMain.on('answer-permission',  (_, key, granted) => {

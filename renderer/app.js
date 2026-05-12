@@ -10,7 +10,8 @@ const NEWTAB_URL = window.bridge.newtabUrl
 const SETTINGS_URL = window.bridge.settingsUrl
 
 // ── DOM
-const webview       = document.getElementById('webview')
+const webview        = document.getElementById('webview')
+const webviewPrivate = document.getElementById('webview-private')
 const urlInput      = document.getElementById('url-input')
 const btnBack       = document.getElementById('btn-back')
 const btnForward    = document.getElementById('btn-forward')
@@ -62,6 +63,16 @@ const ICO = {
 }
 
 const SPACE_COLORS = ['#0a84ff', '#34c759', '#ff9f0a', '#bf5af2', '#ff453a', '#ff6b35', '#30d158', '#64d2ff']
+
+// SEC-002 — helper anti-XSS pour innerHTML
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+// SEC-001 — retourne le webview actif (normal ou privé)
+function wv() { return activeTabIsPrivate() ? webviewPrivate : webview }
 
 // ── Virtual list — rend uniquement les items visibles
 const ITEM_H = 30
@@ -296,7 +307,7 @@ function renderTopTabs() {
     const fav = t.favicon
       ? `<img class="top-tab-favicon" src="${t.favicon}" draggable="false" onerror="this.style.display='none'">`
       : `<div class="top-tab-fav-placeholder"></div>`
-    li.innerHTML = `${fav}<span class="top-tab-title">${t.title || 'Nouvel onglet'}</span><button class="top-tab-close" data-close="${t.id}">✕</button>`
+    li.innerHTML = `${fav}<span class="top-tab-title">${escapeHtml(t.title) || 'Nouvel onglet'}</span><button class="top-tab-close" data-close="${t.id}">✕</button>`
     frag.appendChild(li)
   }
   topTabsList.replaceChildren(frag)
@@ -335,15 +346,19 @@ function normalizeUrl(raw) {
 function navigate(url) {
   url = normalizeUrl(url)
   syncUrlBars(displayUrl(url))
-  if (webviewReady) webview.loadURL(url).catch(() => {})
-  else webview.src = url
+  const isPriv = activeTabIsPrivate()
+  webview.style.display        = isPriv ? 'none' : ''
+  webviewPrivate.style.display = isPriv ? '' : 'none'
+  const w = isPriv ? webviewPrivate : webview
+  if (webviewReady) w.loadURL(url).catch(() => {})
+  else w.src = url
   saveState()
 }
 
 function updateNavButtons() {
   if (!webviewReady) return
-  const canBack = webview.canGoBack()
-  const canFwd  = webview.canGoForward()
+  const canBack = wv().canGoBack()
+  const canFwd  = wv().canGoForward()
   btnBack.disabled    = !canBack;  topBtnBack.disabled    = !canBack
   btnForward.disabled = !canFwd;   topBtnForward.disabled = !canFwd
 }
@@ -389,7 +404,7 @@ function activateTab(id) {
   if (wasEssential) renderEssentials()
   renderTabs()
   if (wasArchived)  renderArchived()
-  if (webviewReady) webview.setAudioMuted(t.muted || false)
+  if (webviewReady) wv().setAudioMuted(t.muted || false)
   globalMuted = t.muted || false; globalPlaying = false
   updateTitlebarFavicon(); updateMuteBtn(); updatePrivateUI()
 }
@@ -400,7 +415,7 @@ function unloadTab(id) {
   const isActive = id === activeTabId && !activeEssentialId
   function doUnload() {
     tab.unloaded = true
-    if (isActive && webviewReady) webview.loadURL('about:blank').catch(() => {})
+    if (isActive && webviewReady) wv().loadURL('about:blank').catch(() => {})
     saveState(); renderTabs()
   }
   if (isActive && webviewReady) {
@@ -482,7 +497,7 @@ function activateEssential(id) {
   navigate(e.url)
   renderEssentials()
   if (wasTab) renderTabs()
-  if (webviewReady) webview.setAudioMuted(false)
+  if (webviewReady) wv().setAudioMuted(false)
   globalMuted = false; globalPlaying = false
   updateTitlebarFavicon(); updateMuteBtn(); updatePrivateUI()
 }
@@ -592,7 +607,7 @@ function buildFavRow(fav, indented) {
   const faviconHtml = fav.favicon
     ? `<img class="tab-favicon" src="${fav.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
     : `<div class="tab-favicon-placeholder"></div>`
-  li.innerHTML = `${faviconHtml}<span class="tab-title">${fav.title}</span><button class="tab-close" data-remove-fav="${fav.id}">✕</button>`
+  li.innerHTML = `${faviconHtml}<span class="tab-title">${escapeHtml(fav.title)}</span><button class="tab-close" data-remove-fav="${fav.id}">✕</button>`
   return li
 }
 
@@ -604,7 +619,7 @@ function buildFolderRow(folder) {
   li.innerHTML = `
     <svg class="folder-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
     <svg class="folder-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-    <span class="tab-title">${folder.title}</span>
+    <span class="tab-title">${escapeHtml(folder.title)}</span>
     <button class="tab-close" data-remove-folder="${folder.id}">✕</button>
   `
   return li
@@ -930,7 +945,7 @@ function renderArchived() {
     const faviconHtml = t.favicon
       ? `<img class="tab-favicon" src="${t.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
       : `<div class="tab-favicon-placeholder"></div>`
-    li.innerHTML = `${faviconHtml}<span class="tab-title">${t.title}</span><button class="tab-close" data-del="${t.id}">✕</button>`
+    li.innerHTML = `${faviconHtml}<span class="tab-title">${escapeHtml(t.title)}</span><button class="tab-close" data-del="${t.id}">✕</button>`
     li.addEventListener('click', e => { if (!e.target.closest('[data-del]')) unarchiveTab(t.id) })
     li.querySelector('[data-del]').addEventListener('click', () => {
       tabs = tabs.filter(x => x.id !== t.id); saveState(); renderArchived()
@@ -976,7 +991,7 @@ function renderEssentials() {
     li.dataset.id = e.id; li.draggable = true
     li.innerHTML = `
       <img class="tab-favicon" src="${e.favicon || ''}" loading="lazy" draggable="false" onerror="this.style.display='none'">
-      <span class="tab-title">${e.title}</span>
+      <span class="tab-title">${escapeHtml(e.title)}</span>
       <button class="tab-close" data-unload-ess="${e.id}">✕</button>
     `
     frag.appendChild(li)
@@ -998,7 +1013,7 @@ function buildTabItem(t) {
       : `<div class="tab-favicon-placeholder"></div>`
   li.innerHTML = `
     ${faviconHtml}
-    <span class="tab-title">${t.title}</span>
+    <span class="tab-title">${escapeHtml(t.title)}</span>
     <button class="tab-mute" data-mute="${t.id}" title="${t.muted ? 'Activer le son' : 'Couper le son'}">${t.muted ? ICON_MUTED : ICON_AUDIO}</button>
     <button class="tab-close" data-close="${t.id}">✕</button>
   `
@@ -1046,7 +1061,7 @@ function buildContextMenu(type) {
     if (moveable.length) {
       html += `<div class="ctx-divider"></div><div class="ctx-label">Déplacer dans</div>`
       for (const folder of moveable)
-        html += `<button class="ctx-item" data-action="move-to-folder" data-folder-id="${folder.id}">${ICO.folder} ${folder.title}</button>`
+        html += `<button class="ctx-item" data-action="move-to-folder" data-folder-id="${folder.id}">${ICO.folder} ${escapeHtml(folder.title)}</button>`
     }
     html += `<div class="ctx-divider"></div><button class="ctx-item danger" data-action="remove-favorite">${ICO.close} Retirer des favoris</button>`
     contextMenu.innerHTML = html
@@ -1069,7 +1084,7 @@ function buildContextMenu(type) {
     if (otherSpaces.length) {
       html += `<div class="ctx-divider"></div><div class="ctx-label">Déplacer vers</div>`
       for (const s of otherSpaces) {
-        html += `<button class="ctx-item" data-action="move-space" data-target-space="${s.id}"><span class="ctx-space-dot" style="background:${s.color}"></span>${s.name}</button>`
+        html += `<button class="ctx-item" data-action="move-space" data-target-space="${s.id}"><span class="ctx-space-dot" style="background:${s.color}"></span>${escapeHtml(s.name)}</button>`
       }
     }
     html += `<div class="ctx-divider"></div><button class="ctx-item danger" data-action="close">${ICO.close} Fermer l'onglet</button>`
@@ -1137,8 +1152,8 @@ function renderHistory() {
     el.innerHTML = `
       ${item.favicon ? `<img src="${item.favicon}" onerror="this.style.display='none'">` : '<div style="width:15px"></div>'}
       <div class="history-item-info">
-        <div class="history-item-title">${item.title}</div>
-        <div class="history-item-url">${item.url}</div>
+        <div class="history-item-title">${escapeHtml(item.title)}</div>
+        <div class="history-item-url">${escapeHtml(item.url)}</div>
       </div>
       <div class="history-item-time">${d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
     `
@@ -1216,11 +1231,11 @@ function openFind() { findBar.classList.add('visible'); findInput.focus(); if (f
 function closeFind() {
   findBar.classList.remove('visible'); findCount.textContent = ''
   findCount.classList.remove('no-result')
-  if (webviewReady) webview.stopFindInPage('clearSelection')
+  if (webviewReady) wv().stopFindInPage('clearSelection')
 }
 function doFind(fwd = true) {
   const text = findInput.value.trim(); if (!text || !webviewReady) return
-  webview.findInPage(text, { forward: fwd, findNext: true })
+  wv().findInPage(text, { forward: fwd, findNext: true })
 }
 
 
@@ -1230,7 +1245,7 @@ function doFind(fwd = true) {
 
 function applyZoom(f) {
   zoomLevel = Math.max(0.25, Math.min(5, Math.round(f * 10) / 10))
-  if (webviewReady) webview.setZoomFactor(zoomLevel)
+  if (webviewReady) wv().setZoomFactor(zoomLevel)
 }
 function zoomIn()    { applyZoom(zoomLevel + 0.1) }
 function zoomOut()   { applyZoom(zoomLevel - 0.1) }
@@ -1277,18 +1292,17 @@ function handleShortcut(mod, shift, alt, code) {
   if (mod && shift && code === 'KeyT') { restoreClosedTab(); return true }
   if (mod && shift && code === 'KeyN') { createTab(null, true); return true }
   if (mod && code === 'KeyW') { if (!activeEssentialId && activeTabId) closeTab(activeTabId); return true }
-  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; setTimeout(() => { webview.blur(); inp.focus(); inp.select() }, 50); return true }
-  if (mod && code === 'KeyR') { if (webviewReady) shift ? webview.reloadIgnoringCache() : webview.reload(); return true }
-  if (mod && code === 'KeyF') { setTimeout(() => { webview.blur(); openFind() }, 50); return true }
+  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; setTimeout(() => { wv().blur(); inp.focus(); inp.select() }, 50); return true }
+  if (mod && code === 'KeyR') { if (webviewReady) shift ? wv().reloadIgnoringCache() : wv().reload(); return true }
+  if (mod && code === 'KeyF') { setTimeout(() => { wv().blur(); openFind() }, 50); return true }
   if (mod && code === 'KeyH') { toggleHistory(); return true }
   if (mod && code === 'KeyB') { toggleSidebar(); return true }
   if (mod && code === 'KeyD') { addCurrentPageAsEssential(); return true }
   if (code === 'F3')  { openFind(); return true }
-  if (code === 'F5')  { if (webviewReady) webview.reload(); return true }
+  if (code === 'F5')  { if (webviewReady) wv().reload(); return true }
   if (code === 'F11') { window.bridge.toggleFullscreen(); return true }
-  if (code === 'F12') { if (webviewReady) webview.openDevTools(); return true }
-  if (alt && code === 'ArrowLeft')  { if (webviewReady && webview.canGoBack())    webview.goBack();    return true }
-  if (alt && code === 'ArrowRight') { if (webviewReady && webview.canGoForward()) webview.goForward(); return true }
+  if (alt && code === 'ArrowLeft')  { if (webviewReady && wv().canGoBack())    wv().goBack();    return true }
+  if (alt && code === 'ArrowRight') { if (webviewReady && wv().canGoForward()) wv().goForward(); return true }
   if (mod && (code === 'Equal'  || code === 'NumpadAdd'))      { zoomIn();    return true }
   if (mod && (code === 'Minus'  || code === 'NumpadSubtract')) { zoomOut();   return true }
   if (mod && (code === 'Digit0' || code === 'Numpad0'))        { zoomReset(); return true }
@@ -1297,7 +1311,7 @@ function handleShortcut(mod, shift, alt, code) {
     if (findBar.classList.contains('visible'))    { closeFind();   return true }
     if (historyPanel.classList.contains('visible')) { closeHistory(); return true }
     if (document.activeElement === urlInput || document.activeElement === topUrlInput) { document.activeElement.blur(); return true }
-    if (isLoading && webviewReady) { webview.stop(); return true }
+    if (isLoading && webviewReady) { wv().stop(); return true }
   }
   if (mod && code === 'Tab' && !activeEssentialId) {
     const at = getActiveTabs()
@@ -1359,7 +1373,7 @@ tabsList.addEventListener('click', e => {
     const tab = tabs.find(t => t.id === muteBtn.dataset.mute)
     if (tab) {
       tab.muted = !tab.muted
-      if (activeTabId === tab.id && webviewReady) webview.setAudioMuted(tab.muted)
+      if (activeTabId === tab.id && webviewReady) wv().setAudioMuted(tab.muted)
       if (activeTabId === tab.id) { globalMuted = tab.muted; updateMuteBtn() }
       saveState(); renderTabs()
     }
@@ -1438,12 +1452,12 @@ urlInput.addEventListener('keydown', e => {
   navigate(url)
 })
 
-btnBack.addEventListener('click',    () => { if (webviewReady && webview.canGoBack())    webview.goBack() })
-btnForward.addEventListener('click', () => { if (webviewReady && webview.canGoForward()) webview.goForward() })
-btnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? webview.stop() : webview.reload() })
+btnBack.addEventListener('click',    () => { if (webviewReady && wv().canGoBack())    wv().goBack() })
+btnForward.addEventListener('click', () => { if (webviewReady && wv().canGoForward()) wv().goForward() })
+btnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? wv().stop() : wv().reload() })
 btnMute.addEventListener('click', () => {
   globalMuted = !globalMuted
-  if (webviewReady) webview.setAudioMuted(globalMuted)
+  if (webviewReady) wv().setAudioMuted(globalMuted)
   if (activeTabId && !activeEssentialId) {
     const tab = tabs.find(t => t.id === activeTabId)
     if (tab) { tab.muted = globalMuted; saveState(); renderTabs() }
@@ -1466,15 +1480,15 @@ topUrlInput.addEventListener('keydown', e => {
   if (activeTabId && !activeEssentialId) { const tab = tabs.find(t => t.id === activeTabId); if (tab) tab.url = url }
   navigate(url)
 })
-topBtnBack.addEventListener('click',    () => { if (webviewReady && webview.canGoBack())    webview.goBack() })
-topBtnForward.addEventListener('click', () => { if (webviewReady && webview.canGoForward()) webview.goForward() })
-topBtnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? webview.stop() : webview.reload() })
+topBtnBack.addEventListener('click',    () => { if (webviewReady && wv().canGoBack())    wv().goBack() })
+topBtnForward.addEventListener('click', () => { if (webviewReady && wv().canGoForward()) wv().goForward() })
+topBtnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? wv().stop() : wv().reload() })
 topBtnMute.addEventListener('click',    () => btnMute.click())
 
 // Boutons souris supplémentaires (retour = 3, avant = 4)
 window.addEventListener('mouseup', e => {
-  if (e.button === 3) { if (webviewReady && webview.canGoBack())    webview.goBack() }
-  if (e.button === 4) { if (webviewReady && webview.canGoForward()) webview.goForward() }
+  if (e.button === 3) { if (webviewReady && wv().canGoBack())    wv().goBack() }
+  if (e.button === 4) { if (webviewReady && wv().canGoForward()) wv().goForward() }
 })
 document.getElementById('top-btn-new-tab').addEventListener('click', () => createTab())
 topTabsList.addEventListener('click', e => {
@@ -1510,8 +1524,8 @@ document.addEventListener('mouseup', () => {
 
 findInput.addEventListener('input', () => {
   const text = findInput.value.trim(); if (!webviewReady) return
-  if (text) webview.findInPage(text)
-  else { webview.stopFindInPage('clearSelection'); findCount.textContent = '' }
+  if (text) wv().findInPage(text)
+  else { wv().stopFindInPage('clearSelection'); findCount.textContent = '' }
 })
 findInput.addEventListener('keydown', e => {
   e.stopPropagation()
@@ -1638,19 +1652,19 @@ webview.addEventListener('did-stop-loading', () => {
   if (isNewtab(url)) {
     const engine = localStorage.getItem('divo-search-engine') || 'google'
     webview.executeJavaScript(`
-      window.__divoEngine = '${engine}';
-      localStorage.setItem('divo-theme', '${currentTheme}');
-      document.documentElement.setAttribute('data-theme', '${currentTheme}');
+      window.__divoEngine = ${JSON.stringify(engine)};
+      localStorage.setItem('divo-theme', ${JSON.stringify(currentTheme)});
+      document.documentElement.setAttribute('data-theme', ${JSON.stringify(currentTheme)});
     `).catch(() => {})
   }
   if (isSettings(url)) {
     webview.executeJavaScript(`
-      localStorage.setItem('divo-theme', '${currentTheme}');
+      localStorage.setItem('divo-theme', ${JSON.stringify(currentTheme)});
       const t = document.getElementById('theme-select');
-      if (t) t.value = '${currentTheme}';
-      document.documentElement.setAttribute('data-theme', '${currentTheme}');
+      if (t) t.value = ${JSON.stringify(currentTheme)};
+      document.documentElement.setAttribute('data-theme', ${JSON.stringify(currentTheme)});
       const l = document.getElementById('layout-select');
-      if (l) l.value = '${currentLayout}';
+      if (l) l.value = ${JSON.stringify(currentLayout)};
     `).catch(() => {})
   }
   if (!isSpecial(url)) {
@@ -1687,11 +1701,11 @@ webview.addEventListener('did-navigate', e => {
       const aa = localStorage.getItem('divo-auto-archive')  || 'off'
       const ab = await window.bridge.adblockStatus()
       webview.executeJavaScript(`
-        document.getElementById('search-engine').value    = '${se}';
-        document.getElementById('homepage').value          = '${hp}';
-        document.getElementById('save-session').value     = '${ss}';
-        document.getElementById('auto-archive').value     = '${aa}';
-        document.getElementById('adblock-toggle').checked = ${ab};
+        document.getElementById('search-engine').value    = ${JSON.stringify(se)};
+        document.getElementById('homepage').value          = ${JSON.stringify(hp)};
+        document.getElementById('save-session').value     = ${JSON.stringify(ss)};
+        document.getElementById('auto-archive').value     = ${JSON.stringify(aa)};
+        document.getElementById('adblock-toggle').checked = ${!!ab};
       `).catch(() => {})
     }, 300)
   }
@@ -1708,25 +1722,35 @@ webview.addEventListener('did-navigate-in-page', e => {
 })
 
 webview.addEventListener('page-title-updated', e => {
+  const currentUrl = webview.getURL()
   if (e.title.startsWith('divo-action:')) {
-    const action = e.title.replace('divo-action:', '')
-    if (action === 'ext-install') window.bridge.extInstall()
-    if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
-    if (action.startsWith('theme:'))  applyTheme(action.replace('theme:', ''))
-    if (action.startsWith('layout:')) applyLayout(action.replace('layout:', ''))
-    if (action.startsWith('pick-download-path')) {
-      window.bridge.pickDownloadPath().then(newPath => {
-        if (!newPath || !webviewReady) return
-        const escaped = newPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
-        webview.executeJavaScript(`
-          const el = document.getElementById('download-path-display')
-          if (el) el.textContent = '${escaped}'
-        `).catch(() => {})
-      })
+    // SEC-003 — seulement accepter les actions depuis des pages divo://
+    if (!isSpecial(currentUrl)) {
+      // page web normale, ne pas traiter — tomber vers la mise à jour du titre
+    } else {
+      const action = e.title.replace('divo-action:', '')
+      if (action === 'ext-install') window.bridge.extInstall()
+      if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
+      if (action.startsWith('theme:'))  applyTheme(action.replace('theme:', ''))
+      if (action.startsWith('layout:')) applyLayout(action.replace('layout:', ''))
+      if (action.startsWith('pick-download-path')) {
+        window.bridge.pickDownloadPath().then(newPath => {
+          if (!newPath || !webviewReady) return
+          const escaped = newPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+          webview.executeJavaScript(`
+            const el = document.getElementById('download-path-display')
+            if (el) el.textContent = '${escaped}'
+          `).catch(() => {})
+        })
+      }
+      return
     }
-    return
-  }
-  if (e.title.startsWith('divo-settings:')) {
+  } else if (e.title.startsWith('divo-settings:')) {
+    // SEC-003 — seulement accepter les settings depuis des pages divo://
+    if (!isSpecial(currentUrl)) {
+      // page web normale, ignorer
+      return
+    }
     try {
       const s = JSON.parse(e.title.replace('divo-settings:', ''))
       if (s.searchEngine) localStorage.setItem('divo-search-engine', s.searchEngine)
@@ -1776,6 +1800,92 @@ webview.addEventListener('media-paused', () => {
 webview.addEventListener('new-window', e => {
   if (e.disposition === 'save-to-disk') return
   e.preventDefault(); if (e.url) createTab(e.url)
+})
+
+
+// ============================================================
+// ÉVÉNEMENTS — WEBVIEW PRIVÉ (SEC-001)
+// ============================================================
+
+webviewPrivate.addEventListener('dom-ready', () => {
+  // Le webviewReady est partagé — les deux webviews sont prêts quand le principal l'est
+  // mais on s'assure que le privé est aussi prêt
+  if (!webviewReady) { webviewReady = true; updateNavButtons() }
+})
+
+webviewPrivate.addEventListener('did-start-loading', () => {
+  if (!activeTabIsPrivate()) return
+  isLoading = true; btnReload.innerHTML = ICON_STOP; btnReload.title = 'Arrêter'; startProgress()
+})
+
+webviewPrivate.addEventListener('did-stop-loading', () => {
+  if (!activeTabIsPrivate()) return
+  isLoading = false; btnReload.innerHTML = ICON_RELOAD; btnReload.title = 'Recharger'
+  completeProgress(); updateNavButtons()
+})
+
+webviewPrivate.addEventListener('did-navigate', e => {
+  if (!activeTabIsPrivate()) return
+  syncUrlBars(displayUrl(e.url))
+  if (activeTabId && !activeEssentialId) {
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (tab) { tab.url = e.url; saveState() }
+  }
+  globalPlaying = false; updateMuteBtn(); updateNavButtons()
+  if (findBar.classList.contains('visible')) closeFind()
+  permBar.classList.remove('visible')
+})
+
+webviewPrivate.addEventListener('did-navigate-in-page', e => {
+  if (!activeTabIsPrivate() || !e.isMainFrame) return
+  syncUrlBars(displayUrl(e.url))
+  if (activeTabId && !activeEssentialId) {
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (tab) { tab.url = e.url; saveState() }
+  }
+  updateNavButtons()
+})
+
+webviewPrivate.addEventListener('page-title-updated', e => {
+  if (!activeTabIsPrivate()) return
+  if (!activeTabId || activeEssentialId) return
+  const tab = tabs.find(t => t.id === activeTabId)
+  if (!tab || isSpecial(tab.url)) return
+  if (tab.title !== e.title) { tab.title = e.title; saveState(); renderTabs() }
+})
+
+webviewPrivate.addEventListener('page-favicon-updated', e => {
+  // Pas de favicon en mode privé
+})
+
+webviewPrivate.addEventListener('media-started-playing', () => {
+  if (!activeTabIsPrivate()) return
+  globalPlaying = true; updateMuteBtn()
+  if (activeTabId && !activeEssentialId) {
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (tab && !tab.playing) { tab.playing = true; renderTabs() }
+  }
+})
+
+webviewPrivate.addEventListener('media-paused', () => {
+  if (!activeTabIsPrivate()) return
+  globalPlaying = false; updateMuteBtn()
+  if (activeTabId && !activeEssentialId) {
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (tab && tab.playing) { tab.playing = false; renderTabs() }
+  }
+})
+
+webviewPrivate.addEventListener('found-in-page', e => {
+  if (!activeTabIsPrivate()) return
+  const { activeMatchOrdinal, matches } = e.result
+  if (matches > 0) { findCount.textContent = `${activeMatchOrdinal}/${matches}`; findCount.classList.remove('no-result') }
+  else { findCount.textContent = 'Introuvable'; findCount.classList.add('no-result') }
+})
+
+webviewPrivate.addEventListener('new-window', e => {
+  if (e.disposition === 'save-to-disk') return
+  e.preventDefault(); if (e.url) createTab(e.url, true)
 })
 
 
