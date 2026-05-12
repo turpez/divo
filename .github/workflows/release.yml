@@ -9,24 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm install
-      - name: Build Windows
-        run: npm run build
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-build
-          path: dist/*.exe
-
   build-linux:
     runs-on: ubuntu-latest
     steps:
@@ -41,41 +23,7 @@ jobs:
         run: npm run build:linux
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-build
-          path: dist/*.AppImage
-          if-no-files-found: warn
-
-  release:
-    needs: [build-windows, build-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-build
-          path: artifacts
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-build
-          path: artifacts
-      - uses: softprops/action-gh-release@v2
-        with:
-          name: "Divo ${{ github.ref_name }}"
-          files: artifacts/*
-          body: |
-            ## Téléchargement
-
-            | Plateforme | Fichier |
-            |---|---|
-            | Windows (installeur) | `Divo Setup *.exe` |
-            | Windows (portable)   | `Divo *.exe` |
-            | Linux                | `Divo-*.AppImage` |
-
-            **Windows** : SmartScreen peut afficher un avertissement → cliquer "Informations complémentaires" puis "Exécuter quand même".
-
-            **Linux** :
-            ```bash
-            chmod +x Divo-*.AppImage
-            ./Divo-*.AppImage
-            ```
+      - name: Upload AppImage to release
+        run: gh release upload ${{ github.ref_name }} dist/*.AppImage --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
