@@ -1,6 +1,6 @@
 {
   "name": "divo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Divo Browser",
   "author": "Divh",
   "main": "main.js",
@@ -30,17 +30,14 @@
         { "target": "nsis",     "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Divo",
-      "installerIcon": "assets/icon.ico",
-      "uninstallerIcon": "assets/icon.ico",
-      "installerHeaderIcon": "assets/icon.ico"
+      "shortcutName": "Divo"
     }
   }
 }
