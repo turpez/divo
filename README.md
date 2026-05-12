@@ -6,7 +6,35 @@ Navigateur minimaliste inspiré d'Arc, construit avec Electron.
 
 Voir la section [Releases](../../releases) pour télécharger la dernière version.
 
-> Windows affichera un avertissement SmartScreen — cliquer **"Informations complémentaires"** puis **"Exécuter quand même"**.
+### Windows
+
+Télécharger `Divo Setup x.x.x.exe` (installeur) ou `Divo x.x.x.exe` (portable).
+
+> SmartScreen peut afficher un avertissement — cliquer **"Informations complémentaires"** puis **"Exécuter quand même"**.
+
+### Linux
+
+Télécharger `Divo-x.x.x.AppImage`, puis dans un terminal :
+
+```bash
+chmod +x Divo-*.AppImage
+./Divo-*.AppImage
+```
+
+> Sur certaines distributions, il faut activer l'exécution des AppImage dans les propriétés du fichier (clic droit → Propriétés → Autoriser l'exécution).
+
+**Dépendances requises** (si l'AppImage ne démarre pas) :
+
+```bash
+# Debian / Ubuntu
+sudo apt install libgtk-3-0 libnotify4 libnss3 libxss1 libxtst6 xdg-utils
+
+# Fedora
+sudo dnf install gtk3 libnotify nss libXScrnSaver libXtst xdg-utils
+
+# Arch
+sudo pacman -S gtk3 libnotify nss libxss libxtst xdg-utils
+```
 
 ## Fonctionnalités
 
@@ -41,7 +69,12 @@ Voir la section [Releases](../../releases) pour télécharger la dernière versi
 
 ```bash
 npm install
+
+# Windows
 npm run build
+
+# Linux
+npm run build:linux
 ```
 
-Nécessite Node.js 20+ et Windows avec le Mode Développeur activé.
+Nécessite Node.js 20+. Sous Windows, le Mode Développeur doit être activé.
