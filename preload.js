@@ -26,4 +26,7 @@ contextBridge.exposeInMainWorld('bridge', {
   importChromeBookmarks: () => ipcRenderer.invoke('import-chrome-bookmarks'),
   setTheme: (theme) => ipcRenderer.invoke('set-theme', theme),
   importBookmarksHtml:   () => ipcRenderer.invoke('import-bookmarks-html'),
+  getDownloadPath:    () => ipcRenderer.invoke('get-download-path'),
+  pickDownloadPath:   () => ipcRenderer.invoke('pick-download-path'),
+  onWebviewShortcut:  (cb) => ipcRenderer.on('webview-shortcut', (_, d) => cb(d)),
 })

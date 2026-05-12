@@ -229,6 +229,19 @@
     </div>
 
     <div class="section">
+      <div class="section-title">Téléchargements</div>
+      <div class="card">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Dossier de téléchargements</div>
+            <div class="setting-desc" id="download-path-display">...</div>
+          </div>
+          <button id="btn-pick-download" style="background:#2c2c2e;border:1px solid #3a3a3c;border-radius:7px;color:#f5f5f7;font-size:13px;padding:6px 14px;cursor:pointer;flex-shrink:0;">Choisir</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="section-title">Confidentialité</div>
       <div class="card">
         <div class="setting-row">
@@ -244,7 +257,7 @@
       </div>
     </div>
 
-    <p class="version-text">Divo 1.0.6 — fait avec ❤️</p>
+    <p class="version-text">Divo 1.0.7 — fait avec ❤️</p>
   </div>
 
   <script>
@@ -275,6 +288,11 @@
     const layoutSelect = document.getElementById('layout-select')
     layoutSelect.addEventListener('change', function() {
       document.title = 'divo-action:layout:' + this.value
+    })
+    const dlDisplay = document.getElementById('download-path-display')
+    if (dlDisplay && window.__divoDlPath) dlDisplay.textContent = window.__divoDlPath
+    document.getElementById('btn-pick-download').addEventListener('click', function() {
+      document.title = 'divo-action:pick-download-path:' + Date.now()
     })
   </script>
 </body>

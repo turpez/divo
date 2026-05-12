@@ -14,6 +14,16 @@ let mainWindow
 const downloadItems = new Map()
 const pendingPerms  = new Map()
 
+const WEBVIEW_SHORTCUTS = new Set([
+  'ctrl+KeyT', 'ctrl+shift+KeyT', 'ctrl+shift+KeyN', 'ctrl+KeyW',
+  'ctrl+KeyL', 'ctrl+KeyR', 'ctrl+shift+KeyR', 'ctrl+KeyF',
+  'ctrl+KeyH', 'ctrl+KeyB', 'ctrl+KeyD', 'ctrl+Tab', 'ctrl+shift+Tab',
+  'ctrl+Equal', 'ctrl+NumpadAdd', 'ctrl+Minus', 'ctrl+NumpadSubtract',
+  'ctrl+Digit0', 'ctrl+Numpad0',
+  'alt+ArrowLeft', 'alt+ArrowRight',
+  'F3', 'F5', 'F11', 'F12', 'Escape'
+])
+
 // ── Config persistante
 const configPath = path.join(app.getPath('userData'), 'config.json')
 let config = { adblock: true }
@@ -187,7 +197,8 @@ app.whenReady().then(async () => {
                : null
     if (file) {
       const theme = config.theme || 'dark'
-      const inject = `<script>document.documentElement.setAttribute('data-theme','${theme}')<\/script>`
+      const dlPath = JSON.stringify(config.downloadPath || app.getPath('downloads'))
+      const inject = `<script>document.documentElement.setAttribute('data-theme','${theme}');window.__divoDlPath=${dlPath};<\/script>`
       const html = fs.readFileSync(path.join(__dirname, 'renderer', file), 'utf-8')
         .replace('<head>', '<head>' + inject)
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
@@ -198,7 +209,8 @@ app.whenReady().then(async () => {
   // ── Téléchargements
   session.defaultSession.on('will-download', (_, item) => {
     const id = Date.now()
-    item.setSavePath(path.join(app.getPath('downloads'), item.getFilename()))
+    const dlDir = config.downloadPath || app.getPath('downloads')
+    item.setSavePath(path.join(dlDir, item.getFilename()))
     downloadItems.set(id, item)
     mainWindow.webContents.send('dl-start', { id, filename: item.getFilename(), total: item.getTotalBytes() })
     item.on('updated', (_, state) => {
@@ -233,6 +245,15 @@ app.whenReady().then(async () => {
   // ── Nouvelles fenêtres → onglets + injection pub
   app.on('web-contents-created', (_, contents) => {
     if (contents.getType() === 'webview') {
+      contents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown' || !mainWindow) return
+        const mod = input.control || input.meta
+        const key = (mod ? 'ctrl+' : '') + (input.shift ? 'shift+' : '') + (input.alt ? 'alt+' : '') + input.code
+        if (WEBVIEW_SHORTCUTS.has(key)) {
+          event.preventDefault()
+          mainWindow.webContents.send('webview-shortcut', { mod, shift: input.shift, alt: input.alt, code: input.code })
+        }
+      })
       contents.on('did-finish-load', () => {
         if (!config.adblock) return
         const url = contents.getURL()
@@ -268,7 +289,7 @@ ipcMain.on('window-maximize',    () => { mainWindow.isMaximized() ? mainWindow.u
 ipcMain.on('window-close',       () => mainWindow.close())
 ipcMain.on('toggle-fullscreen',  () => mainWindow.setFullScreen(!mainWindow.isFullScreen()))
 ipcMain.on('open-file',          (_, p) => shell.showItemInFolder(p))
-ipcMain.on('open-dl-folder',     () => shell.openPath(app.getPath('downloads')))
+ipcMain.on('open-dl-folder',     () => shell.openPath(config.downloadPath || app.getPath('downloads')))
 ipcMain.on('focus-webview',      (_, id) => { const wc = webContents.fromId(id); if (wc) wc.focus() })
 ipcMain.on('answer-permission',  (_, key, granted) => {
   const cb = pendingPerms.get(key)
@@ -279,6 +300,20 @@ ipcMain.on('answer-permission',  (_, key, granted) => {
 ipcMain.handle('adblock-status', () => config.adblock)
 ipcMain.handle('adblock-toggle', (_, enabled) => { config.adblock = !!enabled; saveConfig(); return config.adblock })
 ipcMain.handle('set-theme', (_, theme) => { config.theme = theme; saveConfig() })
+
+// ── Téléchargements IPC
+ipcMain.handle('get-download-path', () => config.downloadPath || app.getPath('downloads'))
+ipcMain.handle('pick-download-path', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choisir le dossier de téléchargements',
+    properties: ['openDirectory'],
+    defaultPath: config.downloadPath || app.getPath('downloads')
+  })
+  if (canceled || !filePaths.length) return null
+  config.downloadPath = filePaths[0]
+  saveConfig()
+  return filePaths[0]
+})
 
 // ── Extensions IPC
 ipcMain.handle('ext-list', () => session.defaultSession.getAllExtensions().map(serializeExt))

@@ -1212,7 +1212,7 @@ function completeProgress() {
 // RECHERCHE DANS LA PAGE
 // ============================================================
 
-function openFind() { findBar.classList.add('visible'); setTimeout(() => { findInput.focus(); if (findInput.value) findInput.select() }, 0) }
+function openFind() { findBar.classList.add('visible'); findInput.focus(); if (findInput.value) findInput.select() }
 function closeFind() {
   findBar.classList.remove('visible'); findCount.textContent = ''
   findCount.classList.remove('no-result')
@@ -1277,9 +1277,9 @@ function handleShortcut(mod, shift, alt, code) {
   if (mod && shift && code === 'KeyT') { restoreClosedTab(); return true }
   if (mod && shift && code === 'KeyN') { createTab(null, true); return true }
   if (mod && code === 'KeyW') { if (!activeEssentialId && activeTabId) closeTab(activeTabId); return true }
-  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; webview.blur(); inp.focus(); inp.select(); return true }
+  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; setTimeout(() => { webview.blur(); inp.focus(); inp.select() }, 50); return true }
   if (mod && code === 'KeyR') { if (webviewReady) shift ? webview.reloadIgnoringCache() : webview.reload(); return true }
-  if (mod && code === 'KeyF') { webview.blur(); openFind(); return true }
+  if (mod && code === 'KeyF') { setTimeout(() => { webview.blur(); openFind() }, 50); return true }
   if (mod && code === 'KeyH') { toggleHistory(); return true }
   if (mod && code === 'KeyB') { toggleSidebar(); return true }
   if (mod && code === 'KeyD') { addCurrentPageAsEssential(); return true }
@@ -1528,9 +1528,8 @@ document.addEventListener('keydown', e => {
   if (document.activeElement === findInput) return
   if (handleShortcut(mod, e.shiftKey, e.altKey, e.code)) e.preventDefault()
 })
-webview.addEventListener('before-input-event', e => {
-  if (e.type !== 'keyDown') return
-  if (handleShortcut(e.control || e.meta, e.shift, e.alt, e.code)) e.preventDefault()
+window.bridge.onWebviewShortcut(({ mod, shift, alt, code }) => {
+  handleShortcut(mod, shift, alt, code)
 })
 
 window.bridge.onPermissionRequest(data => {
@@ -1715,6 +1714,16 @@ webview.addEventListener('page-title-updated', e => {
     if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
     if (action.startsWith('theme:'))  applyTheme(action.replace('theme:', ''))
     if (action.startsWith('layout:')) applyLayout(action.replace('layout:', ''))
+    if (action.startsWith('pick-download-path')) {
+      window.bridge.pickDownloadPath().then(newPath => {
+        if (!newPath || !webviewReady) return
+        const escaped = newPath.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+        webview.executeJavaScript(`
+          const el = document.getElementById('download-path-display')
+          if (el) el.textContent = '${escaped}'
+        `).catch(() => {})
+      })
+    }
     return
   }
   if (e.title.startsWith('divo-settings:')) {
