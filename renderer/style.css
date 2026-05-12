@@ -1159,6 +1159,76 @@ webview {
   border-radius: 0
 }
 
+/* ── THÈME CLAIR ── */
+html.light, body.light { background: #f2f2f7; color: #1c1c1e }
+
+body.light .titlebar { background: #f2f2f7; border-bottom-color: #d1d1d6 }
+body.light .titlebar-btn { color: #8e8e93 }
+body.light .titlebar-btn:hover { color: #1c1c1e }
+body.light .app-name { color: #636366 }
+
+body.light .win-btn { color: #8e8e93 }
+body.light .win-btn:hover { background: #e5e5ea; color: #1c1c1e }
+body.light .win-btn.close:hover { background: #ff453a; color: #fff }
+
+body.light .sidebar { background: #f2f2f7; border-right-color: #d1d1d6 }
+
+body.light .space-pill { color: #636366 }
+body.light .space-pill:hover { background: #e5e5ea; color: #1c1c1e }
+body.light .space-pill.active { background: rgba(10,132,255,.13); color: #0a84ff }
+body.light .space-rename-input { border-bottom-color: rgba(0,0,0,.2); color: #1c1c1e }
+body.light .space-add-btn { border-color: #c7c7cc; color: #8e8e93 }
+body.light .space-add-btn:hover { border-color: #8e8e93; color: #3a3a3c }
+
+body.light .nav-btn { color: #8e8e93 }
+body.light .nav-btn:hover:not([disabled]) { background: #e5e5ea; color: #1c1c1e }
+
+body.light .url-bar { background: #e5e5ea; color: #1c1c1e; border-color: transparent }
+body.light .url-bar:focus { background: #fff; border-color: rgba(10,132,255,.45) }
+body.light .url-bar::placeholder { color: #aeaeb2 }
+
+body.light .section-label { color: #8e8e93 }
+body.light .section-add { color: #aeaeb2 }
+body.light .section-add:hover { background: rgba(0,0,0,.06); color: #636366 }
+
+body.light .tab-item { color: #1c1c1e }
+body.light .tab-item:hover { background: rgba(0,0,0,.05) }
+body.light .tab-item.active { background: rgba(10,132,255,.11); color: #006edc }
+body.light .tab-close { color: #c7c7cc }
+body.light .tab-close:hover { color: #636366; background: rgba(0,0,0,.07) }
+body.light .tab-item.unloaded { opacity: .45 }
+
+body.light .divider { background: #d1d1d6 }
+
+body.light .sidebar-footer { border-top-color: #d1d1d6 }
+body.light .new-tab-btn { background: #e5e5ea; color: #3a3a3c }
+body.light .new-tab-btn:hover { background: #d1d1d6 }
+body.light .dl-toggle-btn { color: #8e8e93 }
+body.light .dl-toggle-btn:hover { color: #1c1c1e }
+
+body.light .context-menu { background: #fff; border: 1px solid #d1d1d6; box-shadow: 0 8px 32px rgba(0,0,0,.12) }
+body.light .ctx-item { color: #1c1c1e }
+body.light .ctx-item:hover:not([disabled]) { background: rgba(10,132,255,.09); color: #006edc }
+body.light .ctx-item.danger { color: #ff3b30 }
+body.light .ctx-item.danger:hover { background: rgba(255,59,48,.08) }
+body.light .ctx-divider { background: #e5e5ea }
+body.light .ctx-label { color: #8e8e93 }
+
+body.light .folder-icon-svg { color: #d97700 }
+body.light .folder-chevron { color: #aeaeb2 }
+
+body.light .fav-folder:hover { background: rgba(0,0,0,.05) }
+
+body.light .find-bar { background: #f2f2f7; border-top-color: #d1d1d6 }
+body.light #find-input { background: #fff; color: #1c1c1e; border-color: #d1d1d6 }
+body.light .find-nav { color: #636366 }
+body.light .find-nav:hover { background: #e5e5ea }
+body.light #find-count { color: #636366 }
+
+body.light .history-panel { background: #f2f2f7; border-left-color: #d1d1d6 }
+body.light .history-header { border-bottom-color: #d1d1d6 }
+body.light .history-title { color: #1c1c1e }
+
 /* ── DOSSIERS FAVORIS ── */
 .fav-folder {
   cursor: pointer;

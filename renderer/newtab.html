@@ -48,6 +48,20 @@
     .search:focus { background: #1e1e20; border-color: #3a3a3c; box-shadow: 0 0 0 3px rgba(10,132,255,.18); }
 
     .watermark { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #1e1e20; letter-spacing: .08em; user-select: none; }
+
+    /* ── Thème clair ── */
+    html[data-theme="light"], html[data-theme="light"] body { background: #f5f5f7; color: #1c1c1e; }
+    html[data-theme="light"] .time { color: #1c1c1e; }
+    html[data-theme="light"] .greeting { color: #8e8e93; }
+    html[data-theme="light"] .date { color: #636366; }
+    html[data-theme="light"] .search { background: #fff; border-color: #d1d1d6; color: #1c1c1e; box-shadow: 0 2px 10px rgba(0,0,0,.07); }
+    html[data-theme="light"] .search::placeholder { color: #aeaeb2; }
+    html[data-theme="light"] .search:focus { background: #fff; border-color: rgba(10,132,255,.45); box-shadow: 0 0 0 3px rgba(10,132,255,.12); }
+    html[data-theme="light"] .search-icon { color: #aeaeb2; }
+    html[data-theme="light"] .search-wrap:focus-within .search-icon { color: #8e8e93; }
+    html[data-theme="light"] .action-btn { color: #8e8e93; }
+    html[data-theme="light"] .action-btn:hover { background: #e5e5ea; color: #1c1c1e; }
+    html[data-theme="light"] .watermark { color: #e5e5ea; }
   </style>
 </head>
 <body>

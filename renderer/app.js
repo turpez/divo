@@ -139,6 +139,7 @@ let resizeStartW    = 0
 let globalMuted     = false
 let globalPlaying   = false
 let pendingPermKey  = null
+let currentTheme    = 'dark'
 
 
 // ============================================================
@@ -267,6 +268,16 @@ function loadState() {
     tabs = [{ id: 't_default', title: 'Nouvel onglet', url: NEWTAB_URL, favicon: null, spaceId: activeSpaceId, lastUsed: Date.now(), archived: false }]
     activeTabId = 't_default'
   }
+  const savedTheme = localStorage.getItem('divo-theme')
+  if (savedTheme === 'light') applyTheme('light')
+}
+
+function applyTheme(theme) {
+  currentTheme = theme
+  document.documentElement.classList.toggle('light', theme === 'light')
+  document.body.classList.toggle('light', theme === 'light')
+  localStorage.setItem('divo-theme', theme)
+  window.bridge.setTheme(theme)
 }
 
 
@@ -1561,7 +1572,19 @@ webview.addEventListener('did-stop-loading', () => {
   const url = webview.getURL()
   if (isNewtab(url)) {
     const engine = localStorage.getItem('divo-search-engine') || 'google'
-    webview.executeJavaScript(`window.__divoEngine = '${engine}'`).catch(() => {})
+    webview.executeJavaScript(`
+      window.__divoEngine = '${engine}';
+      localStorage.setItem('divo-theme', '${currentTheme}');
+      document.documentElement.setAttribute('data-theme', '${currentTheme}');
+    `).catch(() => {})
+  }
+  if (isSettings(url)) {
+    webview.executeJavaScript(`
+      localStorage.setItem('divo-theme', '${currentTheme}');
+      const t = document.getElementById('theme-select');
+      if (t) t.value = '${currentTheme}';
+      document.documentElement.setAttribute('data-theme', '${currentTheme}');
+    `).catch(() => {})
   }
   if (!isSpecial(url)) {
     const tab = !activeEssentialId && activeTabId ? tabs.find(t => t.id === activeTabId) : null
@@ -1622,6 +1645,7 @@ webview.addEventListener('page-title-updated', e => {
     const action = e.title.replace('divo-action:', '')
     if (action === 'ext-install') window.bridge.extInstall()
     if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
+    if (action.startsWith('theme:')) applyTheme(action.replace('theme:', ''))
     return
   }
   if (e.title.startsWith('divo-settings:')) {

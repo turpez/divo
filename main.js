@@ -182,14 +182,15 @@ app.whenReady().then(async () => {
   // ── Protocole divo://
   protocol.handle('divo', (request) => {
     const url = new URL(request.url)
-    const file = url.hostname === 'newtab'    ? 'newtab.html'
-               : url.hostname === 'settings'  ? 'settings.html'
+    const file = url.hostname === 'newtab'   ? 'newtab.html'
+               : url.hostname === 'settings' ? 'settings.html'
                : null
     if (file) {
-      return new Response(
-        fs.readFileSync(path.join(__dirname, 'renderer', file), 'utf-8'),
-        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-      )
+      const theme = config.theme || 'dark'
+      const inject = `<script>document.documentElement.setAttribute('data-theme','${theme}')<\/script>`
+      const html = fs.readFileSync(path.join(__dirname, 'renderer', file), 'utf-8')
+        .replace('<head>', '<head>' + inject)
+      return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
     }
     return new Response('Not found', { status: 404 })
   })
@@ -277,6 +278,7 @@ ipcMain.on('answer-permission',  (_, key, granted) => {
 // ── Adblock IPC
 ipcMain.handle('adblock-status', () => config.adblock)
 ipcMain.handle('adblock-toggle', (_, enabled) => { config.adblock = !!enabled; saveConfig(); return config.adblock })
+ipcMain.handle('set-theme', (_, theme) => { config.theme = theme; saveConfig() })
 
 // ── Extensions IPC
 ipcMain.handle('ext-list', () => session.defaultSession.getAllExtensions().map(serializeExt))

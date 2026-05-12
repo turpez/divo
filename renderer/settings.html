@@ -113,6 +113,23 @@
       text-align: center;
       margin-top: 48px;
     }
+
+    /* ── Thème clair ── */
+    html[data-theme="light"], html[data-theme="light"] body { background: #f2f2f7; color: #1c1c1e; }
+    html[data-theme="light"] h1 { color: #1c1c1e; }
+    html[data-theme="light"] .section-title { color: #8e8e93; }
+    html[data-theme="light"] .card { background: #fff; }
+    html[data-theme="light"] .setting-row { border-bottom-color: #e5e5ea; }
+    html[data-theme="light"] .setting-label { color: #1c1c1e; }
+    html[data-theme="light"] .setting-desc { color: #8e8e93; }
+    html[data-theme="light"] .version-text { color: #aeaeb2; }
+    html[data-theme="light"] select {
+      background-color: #f2f2f7;
+      border-color: #d1d1d6;
+      color: #1c1c1e;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    }
+    html[data-theme="light"] .toggle-slider { background: #d1d1d6; }
   </style>
 </head>
 <body>
@@ -124,6 +141,22 @@
       </svg>
       Paramètres
     </h1>
+
+    <div class="section">
+      <div class="section-title">Apparence</div>
+      <div class="card">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Thème</div>
+            <div class="setting-desc">Couleurs de l'interface du navigateur</div>
+          </div>
+          <select id="theme-select">
+            <option value="dark">Sombre</option>
+            <option value="light">Clair</option>
+          </select>
+        </div>
+      </div>
+    </div>
 
     <div class="section">
       <div class="section-title">Recherche</div>
@@ -201,7 +234,7 @@
       </div>
     </div>
 
-    <p class="version-text">Divo 1.0.0 — fait avec ❤️</p>
+    <p class="version-text">Divo 1.0.3 — fait avec ❤️</p>
   </div>
 
   <script>
@@ -222,6 +255,12 @@
     document.getElementById('auto-archive').addEventListener('change', syncSettings)
     document.getElementById('adblock-toggle').addEventListener('change', function() {
       document.title = 'divo-action:adblock:' + this.checked
+    })
+    const themeSelect = document.getElementById('theme-select')
+    themeSelect.value = document.documentElement.getAttribute('data-theme') || 'dark'
+    themeSelect.addEventListener('change', function() {
+      document.title = 'divo-action:theme:' + this.value
+      document.documentElement.setAttribute('data-theme', this.value)
     })
   </script>
 </body>
