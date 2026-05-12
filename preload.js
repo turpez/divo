@@ -1,0 +1,26 @@
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('bridge', {
+  minimize:             () => ipcRenderer.send('window-minimize'),
+  maximize:             () => ipcRenderer.send('window-maximize'),
+  close:                () => ipcRenderer.send('window-close'),
+  newtabUrl:            'divo://newtab',
+  settingsUrl:          'divo://settings',
+  toggleFullscreen:     () => ipcRenderer.send('toggle-fullscreen'),
+  focusWebview:         (id) => ipcRenderer.send('focus-webview', id),
+  openFile:             (p)  => ipcRenderer.send('open-file', p),
+  openDlFolder:         ()   => ipcRenderer.send('open-dl-folder'),
+  answerPermission:     (key, granted) => ipcRenderer.send('answer-permission', key, granted),
+  onDlStart:            (cb) => ipcRenderer.on('dl-start',          (_, d) => cb(d)),
+  onDlUpdate:           (cb) => ipcRenderer.on('dl-update',         (_, d) => cb(d)),
+  onDlDone:             (cb) => ipcRenderer.on('dl-done',           (_, d) => cb(d)),
+  onOpenNewTab:         (cb) => ipcRenderer.on('open-new-tab',      (_, u) => cb(u)),
+  onFullscreenChange:   (cb) => ipcRenderer.on('fullscreen-change', (_, v) => cb(v)),
+  onPermissionRequest:  (cb) => ipcRenderer.on('permission-request',(_, d) => cb(d)),
+  adblockStatus: ()        => ipcRenderer.invoke('adblock-status'),
+  adblockToggle: (v)       => ipcRenderer.invoke('adblock-toggle', v),
+  extList:    ()           => ipcRenderer.invoke('ext-list'),
+  extInstall: ()           => ipcRenderer.invoke('ext-install'),
+  extRemove:  (id)         => ipcRenderer.invoke('ext-remove', id),
+  extPopup:   (id, x, y)  => ipcRenderer.invoke('ext-popup', id, x, y),
+})
