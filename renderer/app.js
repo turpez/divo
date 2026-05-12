@@ -10,8 +10,12 @@ const NEWTAB_URL = window.bridge.newtabUrl
 const SETTINGS_URL = window.bridge.settingsUrl
 
 // ── DOM
-const webview        = document.getElementById('webview')
-const webviewPrivate = document.getElementById('webview-private')
+const webview          = document.getElementById('webview')
+const webviewPrivate   = document.getElementById('webview-private')
+const updateBar        = document.getElementById('update-bar')
+const updateMsg        = document.getElementById('update-msg')
+const updateInstallBtn = document.getElementById('update-install-btn')
+const updateDismissBtn = document.getElementById('update-dismiss-btn')
 const urlInput      = document.getElementById('url-input')
 const btnBack       = document.getElementById('btn-back')
 const btnForward    = document.getElementById('btn-forward')
@@ -1912,3 +1916,32 @@ if (activeItem) {
   webview.src = normalizeUrl(activeItem.url)
   syncUrlBars(displayUrl(activeItem.url))
 }
+
+// ── Auto-update
+let pendingUpdateUrl = null
+
+window.bridge.onUpdateAvailable(({ version, url }) => {
+  pendingUpdateUrl = url
+  updateMsg.textContent = `Divo ${version} disponible`
+  updateBar.classList.add('visible')
+})
+
+window.bridge.onUpdateProgress(pct => {
+  updateInstallBtn.textContent = `${pct}%`
+})
+
+updateInstallBtn.addEventListener('click', async () => {
+  if (!pendingUpdateUrl) return
+  updateInstallBtn.disabled = true
+  updateInstallBtn.textContent = '0%'
+  const result = await window.bridge.installUpdate(pendingUpdateUrl)
+  if (!result?.ok) {
+    updateInstallBtn.disabled = false
+    updateInstallBtn.textContent = 'Installer'
+    updateMsg.textContent = 'Erreur — réessayer plus tard'
+  }
+})
+
+updateDismissBtn.addEventListener('click', () => {
+  updateBar.classList.remove('visible')
+})

@@ -28,5 +28,8 @@ contextBridge.exposeInMainWorld('bridge', {
   importBookmarksHtml:   () => ipcRenderer.invoke('import-bookmarks-html'),
   getDownloadPath:    () => ipcRenderer.invoke('get-download-path'),
   pickDownloadPath:   () => ipcRenderer.invoke('pick-download-path'),
-  onWebviewShortcut:  (cb) => ipcRenderer.on('webview-shortcut', (_, d) => cb(d)),
+  onWebviewShortcut:    (cb) => ipcRenderer.on('webview-shortcut',  (_, d) => cb(d)),
+  onUpdateAvailable:    (cb) => ipcRenderer.on('update-available',  (_, d) => cb(d)),
+  onUpdateProgress:     (cb) => ipcRenderer.on('update-progress',   (_, p) => cb(p)),
+  installUpdate:        (url) => ipcRenderer.invoke('install-update', url),
 })

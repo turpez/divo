@@ -162,6 +162,13 @@
 
     <!-- Contenu web -->
     <main class="content">
+      <!-- Barre de mise à jour -->
+      <div class="update-bar" id="update-bar">
+        <span id="update-msg">Mise à jour disponible</span>
+        <button class="update-install-btn" id="update-install-btn">Installer</button>
+        <button class="update-dismiss-btn" id="update-dismiss-btn">✕</button>
+      </div>
+
       <webview id="webview" allowpopups></webview>
       <webview id="webview-private" partition="private:incognito" allowpopups style="display:none"></webview>
 

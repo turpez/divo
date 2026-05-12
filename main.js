@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, protocol, webContents, shell, session, dialog, net } = require('electron')
 const path = require('path')
 const fs   = require('fs')
+const { spawn } = require('child_process')
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'divo', privileges: { standard: true, secure: true, supportFetchAPI: true } }
@@ -159,6 +160,63 @@ function serializeExt(ext) {
   }
 }
 
+// ── Auto-update
+const REPO = 'bleathingman/divo'
+const UPDATE_INTERVAL = 4 * 60 * 60 * 1000
+
+function semverGt(a, b) {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true
+    if ((pa[i] || 0) < (pb[i] || 0)) return false
+  }
+  return false
+}
+
+async function checkForUpdate() {
+  try {
+    const res = await net.fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'Divo-Browser/' + app.getVersion() }
+    })
+    if (!res.ok) return
+    const rel = await res.json()
+    const latest = (rel.tag_name || '').replace(/^v/, '')
+    if (!latest || !semverGt(latest, app.getVersion())) return
+    const asset = rel.assets?.find(a => /Setup.*\.exe$/i.test(a.name))
+    mainWindow?.webContents.send('update-available', {
+      version: latest,
+      url: asset?.browser_download_url || rel.html_url
+    })
+  } catch (e) { console.error('checkForUpdate error', e) }
+}
+
+ipcMain.handle('install-update', async (_, url) => {
+  const tmpPath = path.join(app.getPath('temp'), 'Divo-Setup-update.exe')
+  try {
+    const res = await net.fetch(url)
+    if (!res.ok) throw new Error('HTTP ' + res.status)
+    const total = parseInt(res.headers.get('content-length') || '0', 10)
+    const writer = fs.createWriteStream(tmpPath)
+    const reader = res.body.getReader()
+    let received = 0
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      writer.write(Buffer.from(value))
+      received += value.length
+      if (total > 0) mainWindow?.webContents.send('update-progress', Math.round(received / total * 100))
+    }
+    await new Promise((resolve, reject) => writer.end(e => e ? reject(e) : resolve()))
+    spawn(tmpPath, [], { detached: true, stdio: 'ignore' }).unref()
+    app.quit()
+    return { ok: true }
+  } catch (e) {
+    console.error('install-update error', e)
+    return { ok: false }
+  }
+})
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280, height: 800, minWidth: 600, minHeight: 500,
@@ -291,6 +349,8 @@ app.whenReady().then(async () => {
   })
 
   createWindow()
+  setTimeout(checkForUpdate, 10000)
+  setInterval(checkForUpdate, UPDATE_INTERVAL)
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })

@@ -670,6 +670,45 @@ webview {
   min-height: 0
 }
 
+/* ── UPDATE BAR ── */
+.update-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: #1a3a1a;
+  border-bottom: 1px solid #2d6a2d;
+  font-size: 13px;
+  color: #4cd964;
+  flex-shrink: 0;
+  z-index: 50;
+}
+.update-bar.visible { display: flex; }
+.update-bar span { flex: 1; }
+.update-install-btn {
+  background: #34c759;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.update-install-btn:disabled { opacity: .5; cursor: default; }
+.update-dismiss-btn {
+  background: none;
+  border: none;
+  color: #4cd964;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px 4px;
+  flex-shrink: 0;
+}
+body.light .update-bar { background: #e6f9ec; border-bottom-color: #34c759; color: #1a7a2e; }
+body.light .update-dismiss-btn { color: #1a7a2e; }
+
 /* ── PERMISSION BAR ── */
 .permission-bar {
   display: none;
