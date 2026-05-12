@@ -1212,7 +1212,7 @@ function completeProgress() {
 // RECHERCHE DANS LA PAGE
 // ============================================================
 
-function openFind() { findBar.classList.add('visible'); findInput.focus(); if (findInput.value) findInput.select() }
+function openFind() { findBar.classList.add('visible'); setTimeout(() => { findInput.focus(); if (findInput.value) findInput.select() }, 0) }
 function closeFind() {
   findBar.classList.remove('visible'); findCount.textContent = ''
   findCount.classList.remove('no-result')
@@ -1277,9 +1277,9 @@ function handleShortcut(mod, shift, alt, code) {
   if (mod && shift && code === 'KeyT') { restoreClosedTab(); return true }
   if (mod && shift && code === 'KeyN') { createTab(null, true); return true }
   if (mod && code === 'KeyW') { if (!activeEssentialId && activeTabId) closeTab(activeTabId); return true }
-  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; inp.focus(); inp.select(); return true }
+  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; webview.blur(); inp.focus(); inp.select(); return true }
   if (mod && code === 'KeyR') { if (webviewReady) shift ? webview.reloadIgnoringCache() : webview.reload(); return true }
-  if (mod && code === 'KeyF') { openFind(); return true }
+  if (mod && code === 'KeyF') { webview.blur(); openFind(); return true }
   if (mod && code === 'KeyH') { toggleHistory(); return true }
   if (mod && code === 'KeyB') { toggleSidebar(); return true }
   if (mod && code === 'KeyD') { addCurrentPageAsEssential(); return true }
@@ -1470,6 +1470,12 @@ topBtnBack.addEventListener('click',    () => { if (webviewReady && webview.canG
 topBtnForward.addEventListener('click', () => { if (webviewReady && webview.canGoForward()) webview.goForward() })
 topBtnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? webview.stop() : webview.reload() })
 topBtnMute.addEventListener('click',    () => btnMute.click())
+
+// Boutons souris supplémentaires (retour = 3, avant = 4)
+window.addEventListener('mouseup', e => {
+  if (e.button === 3) { if (webviewReady && webview.canGoBack())    webview.goBack() }
+  if (e.button === 4) { if (webviewReady && webview.canGoForward()) webview.goForward() }
+})
 document.getElementById('top-btn-new-tab').addEventListener('click', () => createTab())
 topTabsList.addEventListener('click', e => {
   const closeBtn = e.target.closest('[data-close]')
