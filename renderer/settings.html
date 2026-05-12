@@ -155,6 +155,16 @@
             <option value="light">Clair</option>
           </select>
         </div>
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Disposition</div>
+            <div class="setting-desc">Position des onglets et de la barre URL</div>
+          </div>
+          <select id="layout-select">
+            <option value="sidebar">Barre latérale</option>
+            <option value="top">Barre du haut</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -261,6 +271,10 @@
     themeSelect.addEventListener('change', function() {
       document.title = 'divo-action:theme:' + this.value
       document.documentElement.setAttribute('data-theme', this.value)
+    })
+    const layoutSelect = document.getElementById('layout-select')
+    layoutSelect.addEventListener('change', function() {
+      document.title = 'divo-action:layout:' + this.value
     })
   </script>
 </body>

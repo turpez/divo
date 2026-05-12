@@ -33,6 +33,12 @@ const dlBar         = document.getElementById('dl-bar')
 const dlList        = document.getElementById('dl-list')
 const tabsSection   = document.querySelector('.tabs-section')
 const sidebar       = document.querySelector('.sidebar')
+const topUrlInput   = document.getElementById('top-url-input')
+const topBtnBack    = document.getElementById('top-btn-back')
+const topBtnForward = document.getElementById('top-btn-forward')
+const topBtnReload  = document.getElementById('top-btn-reload')
+const topBtnMute    = document.getElementById('top-btn-mute')
+const topTabsList   = document.getElementById('top-tabs-list')
 const permBar       = document.getElementById('permission-bar')
 const permText      = document.getElementById('perm-text')
 const appName       = document.getElementById('app-name')
@@ -140,6 +146,7 @@ let globalMuted     = false
 let globalPlaying   = false
 let pendingPermKey  = null
 let currentTheme    = 'dark'
+let currentLayout   = 'sidebar'
 
 
 // ============================================================
@@ -270,6 +277,36 @@ function loadState() {
   }
   const savedTheme = localStorage.getItem('divo-theme')
   if (savedTheme === 'light') applyTheme('light')
+  const savedLayout = localStorage.getItem('divo-layout')
+  if (savedLayout) { currentLayout = savedLayout; document.body.classList.toggle('layout-top', savedLayout === 'top') }
+}
+
+function syncUrlBars(val) {
+  urlInput.value    = val
+  topUrlInput.value = val
+}
+
+function renderTopTabs() {
+  if (currentLayout !== 'top') return
+  const frag = document.createDocumentFragment()
+  for (const t of getActiveTabs()) {
+    const li = document.createElement('li')
+    li.className = 'top-tab' + (t.id === activeTabId ? ' active' : '') + (t.unloaded ? ' unloaded' : '')
+    li.dataset.id = t.id
+    const fav = t.favicon
+      ? `<img class="top-tab-favicon" src="${t.favicon}" draggable="false" onerror="this.style.display='none'">`
+      : `<div class="top-tab-fav-placeholder"></div>`
+    li.innerHTML = `${fav}<span class="top-tab-title">${t.title || 'Nouvel onglet'}</span><button class="top-tab-close" data-close="${t.id}">✕</button>`
+    frag.appendChild(li)
+  }
+  topTabsList.replaceChildren(frag)
+}
+
+function applyLayout(layout) {
+  currentLayout = layout
+  document.body.classList.toggle('layout-top', layout === 'top')
+  localStorage.setItem('divo-layout', layout)
+  renderTabs()
 }
 
 function applyTheme(theme) {
@@ -297,7 +334,7 @@ function normalizeUrl(raw) {
 
 function navigate(url) {
   url = normalizeUrl(url)
-  urlInput.value = displayUrl(url)
+  syncUrlBars(displayUrl(url))
   if (webviewReady) webview.loadURL(url).catch(() => {})
   else webview.src = url
   saveState()
@@ -305,8 +342,10 @@ function navigate(url) {
 
 function updateNavButtons() {
   if (!webviewReady) return
-  btnBack.disabled    = !webview.canGoBack()
-  btnForward.disabled = !webview.canGoForward()
+  const canBack = webview.canGoBack()
+  const canFwd  = webview.canGoForward()
+  btnBack.disabled    = !canBack;  topBtnBack.disabled    = !canBack
+  btnForward.disabled = !canFwd;   topBtnForward.disabled = !canFwd
 }
 
 function updateTitlebarFavicon() {
@@ -968,6 +1007,7 @@ function buildTabItem(t) {
 
 function renderTabs() {
   tabsVL.update(getActiveTabs(), buildTabItem)
+  renderTopTabs()
 }
 
 function render() { renderSpaces(); renderEssentials(); renderFavorites(); renderTabs(); renderArchived() }
@@ -1237,7 +1277,7 @@ function handleShortcut(mod, shift, alt, code) {
   if (mod && shift && code === 'KeyT') { restoreClosedTab(); return true }
   if (mod && shift && code === 'KeyN') { createTab(null, true); return true }
   if (mod && code === 'KeyW') { if (!activeEssentialId && activeTabId) closeTab(activeTabId); return true }
-  if (mod && code === 'KeyL') { urlInput.focus(); urlInput.select(); return true }
+  if (mod && code === 'KeyL') { const inp = currentLayout === 'top' ? topUrlInput : urlInput; inp.focus(); inp.select(); return true }
   if (mod && code === 'KeyR') { if (webviewReady) shift ? webview.reloadIgnoringCache() : webview.reload(); return true }
   if (mod && code === 'KeyF') { openFind(); return true }
   if (mod && code === 'KeyH') { toggleHistory(); return true }
@@ -1256,7 +1296,7 @@ function handleShortcut(mod, shift, alt, code) {
     if (permBar.classList.contains('visible'))    { permBar.classList.remove('visible'); return true }
     if (findBar.classList.contains('visible'))    { closeFind();   return true }
     if (historyPanel.classList.contains('visible')) { closeHistory(); return true }
-    if (document.activeElement === urlInput) { urlInput.blur(); return true }
+    if (document.activeElement === urlInput || document.activeElement === topUrlInput) { document.activeElement.blur(); return true }
     if (isLoading && webviewReady) { webview.stop(); return true }
   }
   if (mod && code === 'Tab' && !activeEssentialId) {
@@ -1418,6 +1458,26 @@ document.getElementById('btn-downloads').addEventListener('click', () => {
   const visible = dlBar.classList.toggle('visible')
   btn.classList.toggle('active', visible)
 })
+// ── Top bar event listeners
+topUrlInput.addEventListener('focus', () => topUrlInput.select())
+topUrlInput.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return
+  const url = normalizeUrl(topUrlInput.value)
+  if (activeTabId && !activeEssentialId) { const tab = tabs.find(t => t.id === activeTabId); if (tab) tab.url = url }
+  navigate(url)
+})
+topBtnBack.addEventListener('click',    () => { if (webviewReady && webview.canGoBack())    webview.goBack() })
+topBtnForward.addEventListener('click', () => { if (webviewReady && webview.canGoForward()) webview.goForward() })
+topBtnReload.addEventListener('click',  () => { if (!webviewReady) return; isLoading ? webview.stop() : webview.reload() })
+topBtnMute.addEventListener('click',    () => btnMute.click())
+document.getElementById('top-btn-new-tab').addEventListener('click', () => createTab())
+topTabsList.addEventListener('click', e => {
+  const closeBtn = e.target.closest('[data-close]')
+  if (closeBtn) { closeTab(closeBtn.dataset.close); return }
+  const item = e.target.closest('.top-tab'); if (!item) return
+  activateTab(item.dataset.id)
+})
+
 document.getElementById('btn-add-essential').addEventListener('click', addCurrentPageAsEssential)
 document.getElementById('btn-add-favorite').addEventListener('click', addCurrentPageAsFavorite)
 document.getElementById('btn-import-bookmarks').addEventListener('click', importBookmarksHtml)
@@ -1458,7 +1518,7 @@ document.getElementById('find-close').addEventListener('click', closeFind)
 
 document.addEventListener('keydown', e => {
   const mod = e.ctrlKey || e.metaKey
-  if (document.activeElement === urlInput && !mod && !e.altKey && e.code !== 'Escape') return
+  if ((document.activeElement === urlInput || document.activeElement === topUrlInput) && !mod && !e.altKey && e.code !== 'Escape') return
   if (document.activeElement === findInput) return
   if (handleShortcut(mod, e.shiftKey, e.altKey, e.code)) e.preventDefault()
 })
@@ -1584,6 +1644,8 @@ webview.addEventListener('did-stop-loading', () => {
       const t = document.getElementById('theme-select');
       if (t) t.value = '${currentTheme}';
       document.documentElement.setAttribute('data-theme', '${currentTheme}');
+      const l = document.getElementById('layout-select');
+      if (l) l.value = '${currentLayout}';
     `).catch(() => {})
   }
   if (!isSpecial(url)) {
@@ -1600,7 +1662,7 @@ webview.addEventListener('did-stop-loading', () => {
 })
 
 webview.addEventListener('did-navigate', e => {
-  urlInput.value = displayUrl(e.url)
+  syncUrlBars(displayUrl(e.url))
   if (activeTabId && !activeEssentialId) {
     const tab = tabs.find(t => t.id === activeTabId)
     if (tab) {
@@ -1632,7 +1694,7 @@ webview.addEventListener('did-navigate', e => {
 
 webview.addEventListener('did-navigate-in-page', e => {
   if (!e.isMainFrame) return
-  urlInput.value = displayUrl(e.url)
+  syncUrlBars(displayUrl(e.url))
   if (activeTabId && !activeEssentialId) {
     const tab = tabs.find(t => t.id === activeTabId)
     if (tab) { tab.url = e.url; saveState() }
@@ -1645,7 +1707,8 @@ webview.addEventListener('page-title-updated', e => {
     const action = e.title.replace('divo-action:', '')
     if (action === 'ext-install') window.bridge.extInstall()
     if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
-    if (action.startsWith('theme:')) applyTheme(action.replace('theme:', ''))
+    if (action.startsWith('theme:'))  applyTheme(action.replace('theme:', ''))
+    if (action.startsWith('layout:')) applyLayout(action.replace('layout:', ''))
     return
   }
   if (e.title.startsWith('divo-settings:')) {
@@ -1721,6 +1784,6 @@ const activeItem = activeEssentialId
   : tabs.find(t => t.id === activeTabId)
 
 if (activeItem) {
-  webview.src   = normalizeUrl(activeItem.url)
-  urlInput.value = displayUrl(activeItem.url)
+  webview.src = normalizeUrl(activeItem.url)
+  syncUrlBars(displayUrl(activeItem.url))
 }

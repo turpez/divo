@@ -1159,6 +1159,157 @@ webview {
   border-radius: 0
 }
 
+/* ── TOP LAYOUT ── */
+/* ── TOP LAYOUT (style VSCode) ── */
+
+.top-nav-bar {
+  display: none;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: #252526;
+  flex-shrink: 0;
+  height: 42px;
+  -webkit-app-region: drag
+}
+body.layout-top .top-nav-bar { display: flex }
+.top-nav-bar .nav-btn { -webkit-app-region: no-drag; color: #858585 }
+.top-nav-bar .nav-btn:hover:not([disabled]) { background: rgba(255,255,255,.07); color: #cccccc }
+
+.top-url-bar {
+  flex: 1 !important;
+  height: 28px !important;
+  font-size: 13px !important;
+  border-radius: 4px !important;
+  max-width: 660px;
+  background: #3c3c3c !important;
+  border-color: transparent !important;
+  color: #cccccc !important;
+  -webkit-app-region: no-drag
+}
+.top-url-bar:focus {
+  border-color: #0a84ff !important;
+  background: #3c3c3c !important;
+  box-shadow: none !important
+}
+.top-url-bar::placeholder { color: #6a6a6a !important }
+
+.top-tab-bar {
+  display: none;
+  align-items: flex-end;
+  background: #252526;
+  border-bottom: 1px solid #1a1a1a;
+  flex-shrink: 0;
+  height: 35px;
+  overflow: hidden
+}
+body.layout-top .top-tab-bar { display: flex }
+
+.top-tabs-list {
+  display: flex;
+  list-style: none;
+  flex: 1;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden
+}
+.top-tabs-list::-webkit-scrollbar { height: 0 }
+
+.top-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-width: 80px;
+  max-width: 200px;
+  height: 100%;
+  border-right: 1px solid #1a1a1a;
+  cursor: pointer;
+  color: #969696;
+  font-size: 12.5px;
+  user-select: none;
+  flex-shrink: 0;
+  position: relative;
+  background: #2d2d2d;
+  transition: color .1s, background .1s
+}
+.top-tab:hover { color: #cccccc; background: #333333 }
+.top-tab.active { background: #1e1e1e; color: #ffffff }
+.top-tab.active::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: #0a84ff
+}
+.top-tab.unloaded { opacity: .5 }
+
+.top-tab-favicon {
+  width: 14px; height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  object-fit: contain
+}
+.top-tab-fav-placeholder { width: 14px; height: 14px; flex-shrink: 0 }
+
+.top-tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+
+.top-tab-close {
+  background: none;
+  border: none;
+  color: transparent;
+  cursor: pointer;
+  width: 18px; height: 18px;
+  border-radius: 3px;
+  font-size: 12px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s, color .1s
+}
+.top-tab:hover .top-tab-close,
+.top-tab.active .top-tab-close { color: #858585 }
+.top-tab-close:hover { background: rgba(255,255,255,.1); color: #cccccc !important }
+
+.top-new-tab-btn {
+  background: none;
+  border: none;
+  color: #858585;
+  cursor: pointer;
+  width: 35px; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: color .1s
+}
+.top-new-tab-btn:hover { color: #cccccc; background: rgba(255,255,255,.06) }
+
+/* Sidebar en top mode */
+body.layout-top .sidebar .nav-row { display: none }
+body.layout-top .sidebar .tabs-section { display: none }
+body.layout-top .sidebar .archive-section { display: none !important }
+
+/* Light + top */
+body.light .top-nav-bar { background: #f3f3f3 }
+body.light .top-nav-bar .nav-btn { color: #717171 }
+body.light .top-nav-bar .nav-btn:hover:not([disabled]) { background: rgba(0,0,0,.06); color: #333 }
+body.light .top-url-bar { background: #ffffff !important; border-color: #cecece !important; color: #333 !important }
+body.light .top-url-bar:focus { border-color: #0a84ff !important }
+body.light .top-url-bar::placeholder { color: #aaa !important }
+body.light .top-tab-bar { background: #ececec; border-bottom-color: #d4d4d4 }
+body.light .top-tab { background: #e0e0e0; color: #777777; border-right-color: #d4d4d4 }
+body.light .top-tab:hover { background: #e8e8e8; color: #444 }
+body.light .top-tab.active { background: #ffffff; color: #333333 }
+body.light .top-tab.active::before { background: #0a84ff }
+body.light .top-tab-close:hover { background: rgba(0,0,0,.08); color: #333 !important }
+body.light .top-tab:hover .top-tab-close,
+body.light .top-tab.active .top-tab-close { color: #888 }
+body.light .top-new-tab-btn { color: #717171 }
+body.light .top-new-tab-btn:hover { background: rgba(0,0,0,.06); color: #333 }
+
 /* ── THÈME CLAIR ── */
 html.light, body.light { background: #f2f2f7; color: #1c1c1e }
 
