@@ -51,6 +51,8 @@ const ICO = {
   sleep:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>`,
   openTab:  `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>`,
   close:    `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+  folder:   `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`,
+  folderUp: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><polyline points="12 12 12 8"></polyline><polyline points="10 10 12 8 14 10"></polyline></svg>`,
 }
 
 const SPACE_COLORS = ['#0a84ff', '#34c759', '#ff9f0a', '#bf5af2', '#ff453a', '#ff6b35', '#30d158', '#64d2ff']
@@ -532,21 +534,218 @@ function startRenameFavorite(id) {
   startRenameInline(li.querySelector('.tab-title'), fav, () => { saveState(); renderFavorites() })
 }
 
+function buildFavRow(fav, indented) {
+  const li = document.createElement('li')
+  li.className = 'tab-item' + (indented ? ' fav-indented' : '')
+  li.dataset.id = fav.id
+  li.dataset.favType = 'url'
+  const faviconHtml = fav.favicon
+    ? `<img class="tab-favicon" src="${fav.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
+    : `<div class="tab-favicon-placeholder"></div>`
+  li.innerHTML = `${faviconHtml}<span class="tab-title">${fav.title}</span><button class="tab-close" data-remove-fav="${fav.id}">✕</button>`
+  return li
+}
+
+function buildFolderRow(folder) {
+  const li = document.createElement('li')
+  li.className = 'tab-item fav-folder' + (folder.open ? ' open' : '')
+  li.dataset.id = folder.id
+  li.dataset.favType = 'folder'
+  li.innerHTML = `
+    <svg class="folder-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+    <svg class="folder-icon-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+    <span class="tab-title">${folder.title}</span>
+    <button class="tab-close" data-remove-folder="${folder.id}">✕</button>
+  `
+  return li
+}
+
 function renderFavorites() {
+  const spaceItems = favorites.filter(f => f.spaceId === activeSpaceId)
   const frag = document.createDocumentFragment()
-  for (const f of favorites.filter(f => f.spaceId === activeSpaceId)) {
-    const li = document.createElement('li')
-    li.className = 'tab-item'
-    li.dataset.id = f.id
-    const faviconHtml = f.favicon
-      ? `<img class="tab-favicon" src="${f.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
-      : `<div class="tab-favicon-placeholder"></div>`
-    li.innerHTML = `${faviconHtml}<span class="tab-title">${f.title}</span><button class="tab-close" data-remove-fav="${f.id}">✕</button>`
-    frag.appendChild(li)
+  for (const item of spaceItems) {
+    if (item.folderId) continue  // rendu sous son dossier
+    if (item.type === 'folder') {
+      frag.appendChild(buildFolderRow(item))
+      if (item.open) {
+        for (const child of spaceItems.filter(c => c.folderId === item.id))
+          frag.appendChild(buildFavRow(child, true))
+      }
+    } else {
+      frag.appendChild(buildFavRow(item, false))
+    }
   }
   favoritesList.replaceChildren(frag)
 }
 
+function createFolder() {
+  const id = 'folder_' + Date.now()
+  favorites.push({ id, type: 'folder', title: 'Nouveau dossier', spaceId: activeSpaceId, open: true })
+  saveState(); renderFavorites()
+  const li = favoritesList.querySelector(`[data-id="${id}"]`)
+  if (li) startRenameInline(li.querySelector('.tab-title'), favorites.find(f => f.id === id), () => { saveState(); renderFavorites() })
+}
+
+function toggleFolder(id) {
+  const folder = favorites.find(f => f.id === id); if (!folder) return
+  folder.open = !folder.open
+  saveState(); renderFavorites()
+}
+
+function deleteFolder(id) {
+  favorites.forEach(f => { if (f.folderId === id) delete f.folderId })
+  favorites = favorites.filter(f => f.id !== id)
+  saveState(); renderFavorites()
+}
+
+function moveToFolder(favId, folderId) {
+  const fav = favorites.find(f => f.id === favId); if (!fav) return
+  if (folderId) fav.folderId = folderId; else delete fav.folderId
+  saveState(); renderFavorites()
+}
+
+
+// ============================================================
+// IMPORT FAVORIS CHROME / EDGE / BRAVE
+// ============================================================
+
+async function importBookmarksHtml() {
+  const bookmarks = await window.bridge.importBookmarksHtml()
+  if (bookmarks === null) return  // utilisateur a annulé la boîte de dialogue
+  showImportModal(bookmarks)
+}
+
+async function importChromeBookmarks() {
+  const bookmarks = await window.bridge.importChromeBookmarks()
+  showImportModal(bookmarks || [])
+}
+
+function showImportModal(bookmarks) {
+  const existing = document.querySelector('.import-overlay')
+  if (existing) existing.remove()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'import-overlay'
+
+  const countLabel = bookmarks.length === 1 ? '1 trouvé' : `${bookmarks.length} trouvés`
+
+  overlay.innerHTML = `
+    <div class="import-modal">
+      <div class="import-header">
+        <span class="import-title">Importer des favoris</span>
+        <span class="import-found">${countLabel}</span>
+        <button class="import-close-btn">✕</button>
+      </div>
+      ${bookmarks.length > 0 ? `
+      <div class="import-search-row">
+        <input type="text" class="import-search" placeholder="Rechercher…">
+        <label class="import-select-all-label"><input type="checkbox" class="import-chk-all"> Tout</label>
+      </div>
+      <div class="import-list-wrap">
+        <ul class="import-list"></ul>
+      </div>
+      <div class="import-footer">
+        <span class="import-count">0 sélectionné(s)</span>
+        <button class="import-cancel-btn">Annuler</button>
+        <button class="import-confirm-btn" disabled>Importer</button>
+      </div>` : `
+      <div class="import-empty-state">
+        <p>Aucun favori trouvé.<br>Chrome, Edge ou Brave doit être installé.</p>
+        <button class="import-cancel-btn">Fermer</button>
+      </div>`}
+    </div>
+  `
+
+  document.body.appendChild(overlay)
+
+  function close() { overlay.remove() }
+  overlay.querySelector('.import-close-btn').addEventListener('click', close)
+  overlay.addEventListener('click', e => { if (e.target === overlay) close() })
+
+  if (!bookmarks.length) {
+    overlay.querySelector('.import-cancel-btn').addEventListener('click', close)
+    return
+  }
+
+  const searchInput = overlay.querySelector('.import-search')
+  const chkAll      = overlay.querySelector('.import-chk-all')
+  const list        = overlay.querySelector('.import-list')
+  const countEl     = overlay.querySelector('.import-count')
+  const cancelBtn   = overlay.querySelector('.import-cancel-btn')
+  const confirmBtn  = overlay.querySelector('.import-confirm-btn')
+
+  const selected = new Set()
+
+  function updateCount() {
+    const n = selected.size
+    countEl.textContent = `${n} sélectionné(s)`
+    confirmBtn.disabled = n === 0
+    confirmBtn.textContent = n > 0 ? `Importer (${n})` : 'Importer'
+  }
+
+  function getVisible() {
+    const q = searchInput.value.toLowerCase()
+    return q ? bookmarks.filter(b => b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q)) : bookmarks
+  }
+
+  function buildList() {
+    const frag = document.createDocumentFragment()
+    const visible = getVisible()
+    for (const bk of visible) {
+      const li = document.createElement('li')
+      li.className = 'import-item'
+      const cb = document.createElement('input')
+      cb.type = 'checkbox'
+      cb.className = 'import-cb'
+      cb.checked = selected.has(bk.url)
+      cb.addEventListener('change', () => {
+        if (cb.checked) selected.add(bk.url); else selected.delete(bk.url)
+        updateCount()
+      })
+      const info = document.createElement('div')
+      info.className = 'import-item-info'
+      const safeTitle = bk.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      const safeUrl   = bk.url.replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      info.innerHTML = `<div class="import-item-title">${safeTitle}</div><div class="import-item-url">${safeUrl}</div>`
+      li.appendChild(cb)
+      li.appendChild(info)
+      li.addEventListener('click', e => { if (e.target !== cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')) } })
+      frag.appendChild(li)
+    }
+    if (!visible.length) {
+      const li = document.createElement('li')
+      li.className = 'import-empty'
+      li.textContent = 'Aucun résultat'
+      frag.appendChild(li)
+    }
+    list.replaceChildren(frag)
+  }
+
+  buildList()
+  searchInput.addEventListener('input', buildList)
+
+  chkAll.addEventListener('change', () => {
+    const visible = getVisible()
+    if (chkAll.checked) visible.forEach(b => selected.add(b.url))
+    else visible.forEach(b => selected.delete(b.url))
+    buildList()
+    updateCount()
+  })
+
+  cancelBtn.addEventListener('click', close)
+
+  confirmBtn.addEventListener('click', () => {
+    const toImport = bookmarks.filter(b => selected.has(b.url))
+    for (let i = 0; i < toImport.length; i++) {
+      const bk = toImport[i]
+      if (!isSpecial(bk.url) && !favorites.some(f => f.url === bk.url && f.spaceId === activeSpaceId)) {
+        favorites.push({ id: 'f' + Date.now() + '_' + i, title: bk.title || bk.url, url: bk.url, favicon: null, spaceId: activeSpaceId })
+      }
+    }
+    saveState(); renderFavorites()
+    close()
+  })
+}
 
 // ============================================================
 // SPACES
@@ -557,6 +756,8 @@ function switchSpace(id) {
   const curSpace = spaces.find(s => s.id === activeSpaceId)
   if (curSpace) curSpace.activeTabId = activeTabId
   activeSpaceId = id; activeEssentialId = null
+  renderSpaces()
+  renderFavorites()
   const newSpace = spaces.find(s => s.id === id)
   const at = getActiveTabs()
   if (newSpace?.activeTabId && at.find(t => t.id === newSpace.activeTabId)) {
@@ -775,12 +976,29 @@ function buildContextMenu(type) {
     `
     return
   }
-  if (type === 'favorite') {
+  if (type === 'folder') {
     contextMenu.innerHTML = `
       <button class="ctx-item" data-action="rename">${ICO.rename} Renommer</button>
       <div class="ctx-divider"></div>
-      <button class="ctx-item danger" data-action="remove-favorite">${ICO.close} Retirer des favoris</button>
+      <button class="ctx-item danger" data-action="delete-folder">${ICO.close} Supprimer le dossier</button>
     `
+    return
+  }
+  if (type === 'favorite') {
+    const fav = favorites.find(f => f.id === ctxTargetId)
+    const folders = favorites.filter(f => f.type === 'folder' && f.spaceId === activeSpaceId)
+    let html = `<button class="ctx-item" data-action="rename">${ICO.rename} Renommer</button>`
+    if (fav && fav.folderId) {
+      html += `<div class="ctx-divider"></div><button class="ctx-item" data-action="remove-from-folder">${ICO.folderUp} Retirer du dossier</button>`
+    }
+    const moveable = folders.filter(f => f.id !== (fav && fav.folderId))
+    if (moveable.length) {
+      html += `<div class="ctx-divider"></div><div class="ctx-label">Déplacer dans</div>`
+      for (const folder of moveable)
+        html += `<button class="ctx-item" data-action="move-to-folder" data-folder-id="${folder.id}">${ICO.folder} ${folder.title}</button>`
+    }
+    html += `<div class="ctx-divider"></div><button class="ctx-item danger" data-action="remove-favorite">${ICO.close} Retirer des favoris</button>`
+    contextMenu.innerHTML = html
     return
   }
   if (type === 'tab') {
@@ -1064,9 +1282,12 @@ essentialsList.addEventListener('contextmenu', e => {
 })
 
 favoritesList.addEventListener('click', e => {
+  const removeFolderBtn = e.target.closest('[data-remove-folder]')
+  if (removeFolderBtn) { deleteFolder(removeFolderBtn.dataset.removeFolder); return }
   const removeBtn = e.target.closest('[data-remove-fav]')
   if (removeBtn) { removeFavorite(removeBtn.dataset.removeFav); return }
   const item = e.target.closest('.tab-item'); if (!item) return
+  if (item.dataset.favType === 'folder') { toggleFolder(item.dataset.id); return }
   openFavorite(item.dataset.id)
 })
 favoritesList.addEventListener('dblclick', e => {
@@ -1074,8 +1295,9 @@ favoritesList.addEventListener('dblclick', e => {
 })
 favoritesList.addEventListener('contextmenu', e => {
   e.preventDefault()
-  const item = e.target.closest('.tab-item')
-  if (item) showContextMenu(e.clientX, e.clientY, item.dataset.id, 'favorite')
+  const item = e.target.closest('.tab-item'); if (!item) return
+  const menuType = item.dataset.favType === 'folder' ? 'folder' : 'favorite'
+  showContextMenu(e.clientX, e.clientY, item.dataset.id, menuType)
 })
 
 tabsList.addEventListener('click', e => {
@@ -1112,9 +1334,9 @@ contextMenu.addEventListener('click', e => {
   hideContextMenu()
   switch (action) {
     case 'rename':
-      if (type === 'tab')       startRenameTab(targetId)
-      else if (type === 'essential') startRenameEssential(targetId)
-      else if (type === 'favorite')  startRenameFavorite(targetId)
+      if (type === 'tab')                          startRenameTab(targetId)
+      else if (type === 'essential')               startRenameEssential(targetId)
+      else if (type === 'favorite' || type === 'folder') startRenameFavorite(targetId)
       break
     case 'pin':              pinTabAsEssential(targetId); break
     case 'add-favorite':    addTabAsFavorite(targetId); break
@@ -1123,8 +1345,11 @@ contextMenu.addEventListener('click', e => {
     case 'open-tab':         openEssentialInTab(targetId); break
     case 'close':            closeTab(targetId); break
     case 'remove-essential': removeEssential(targetId); break
-    case 'remove-favorite':  removeFavorite(targetId); break
-    case 'rename-space':     renameSpace(targetId); break
+    case 'remove-favorite':    removeFavorite(targetId); break
+    case 'delete-folder':      deleteFolder(targetId); break
+    case 'move-to-folder':     moveToFolder(targetId, btn.dataset.folderId); break
+    case 'remove-from-folder': moveToFolder(targetId, null); break
+    case 'rename-space':       renameSpace(targetId); break
     case 'delete-space':     deleteSpace(targetId); break
   }
 })
@@ -1184,6 +1409,8 @@ document.getElementById('btn-downloads').addEventListener('click', () => {
 })
 document.getElementById('btn-add-essential').addEventListener('click', addCurrentPageAsEssential)
 document.getElementById('btn-add-favorite').addEventListener('click', addCurrentPageAsFavorite)
+document.getElementById('btn-import-bookmarks').addEventListener('click', importBookmarksHtml)
+document.getElementById('btn-add-folder').addEventListener('click', createFolder)
 
 const resizeHandle = document.getElementById('resize-handle')
 resizeHandle.addEventListener('mousedown', e => {

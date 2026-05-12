@@ -23,4 +23,6 @@ contextBridge.exposeInMainWorld('bridge', {
   extInstall: ()           => ipcRenderer.invoke('ext-install'),
   extRemove:  (id)         => ipcRenderer.invoke('ext-remove', id),
   extPopup:   (id, x, y)  => ipcRenderer.invoke('ext-popup', id, x, y),
+  importChromeBookmarks: () => ipcRenderer.invoke('import-chrome-bookmarks'),
+  importBookmarksHtml:   () => ipcRenderer.invoke('import-bookmarks-html'),
 })

@@ -336,3 +336,69 @@ ipcMain.handle('ext-popup', (_, extId, x, y) => {
   })
   popup.on('blur', () => popup.close())
 })
+
+// ── Import bookmarks depuis fichier .htm
+ipcMain.handle('import-bookmarks-html', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Sélectionner le fichier de favoris exporté',
+    filters: [{ name: 'Favoris HTML', extensions: ['htm', 'html'] }],
+    properties: ['openFile'],
+  })
+  if (canceled || !filePaths.length) return null
+  try {
+    const html = fs.readFileSync(filePaths[0], 'utf-8')
+    const links = []
+    const seen = new Set()
+    const re = /<A\s[^>]*HREF="([^"]+)"[^>]*>([^<]*)<\/A>/gi
+    let m
+    while ((m = re.exec(html)) !== null) {
+      const url   = m[1].replace(/&amp;/g, '&')
+      const title = m[2].trim()
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      if (url && !url.startsWith('javascript:') && !seen.has(url)) {
+        seen.add(url)
+        links.push({ title: title || url, url })
+      }
+    }
+    return links
+  } catch { return [] }
+})
+
+// ── Import bookmarks Chrome/Edge/Brave (auto-détection)
+ipcMain.handle('import-chrome-bookmarks', () => {
+  const browsers = [
+    { name: 'Chrome',   base: path.join(process.env.LOCALAPPDATA || '', 'Google',         'Chrome',        'User Data') },
+    { name: 'Edge',     base: path.join(process.env.LOCALAPPDATA || '', 'Microsoft',      'Edge',          'User Data') },
+    { name: 'Brave',    base: path.join(process.env.LOCALAPPDATA || '', 'BraveSoftware',  'Brave-Browser', 'User Data') },
+    { name: 'Chromium', base: path.join(process.env.LOCALAPPDATA || '', 'Chromium',       'Chromium',      'User Data') },
+  ]
+
+  function flattenNode(node, out) {
+    if (node.type === 'url') {
+      if (node.url && !node.url.startsWith('javascript:')) out.push({ title: node.name || node.url, url: node.url })
+    } else if (node.children) {
+      for (const c of node.children) flattenNode(c, out)
+    }
+  }
+
+  const result = []
+  const seen = new Set()
+  for (const br of browsers) {
+    if (!fs.existsSync(br.base)) continue
+    const profiles = ['Default']
+    try { for (const d of fs.readdirSync(br.base)) { if (/^Profile \d+$/.test(d)) profiles.push(d) } } catch {}
+    for (const prof of profiles) {
+      const bkFile = path.join(br.base, prof, 'Bookmarks')
+      if (!fs.existsSync(bkFile)) continue
+      try {
+        const data = JSON.parse(fs.readFileSync(bkFile, 'utf-8'))
+        const flat = []
+        for (const root of Object.values(data.roots || {})) flattenNode(root, flat)
+        for (const bk of flat) {
+          if (!seen.has(bk.url)) { seen.add(bk.url); result.push({ ...bk, browser: br.name }) }
+        }
+      } catch {}
+    }
+  }
+  return result
+})

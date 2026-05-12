@@ -405,6 +405,27 @@ body.private-active .nav-row .nav-btn:hover:not(:disabled) {
   color: #adadb8
 }
 
+#favorites-section {
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0
+}
+
+#favorites-section #favorites-list {
+  overflow-y: auto;
+  min-height: 0
+}
+
+#favorites-section #favorites-list::-webkit-scrollbar {
+  width: 3px
+}
+
+#favorites-section #favorites-list::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.15);
+  border-radius: 2px
+}
+
 .tabs-section {
   flex: 1;
   overflow-y: auto
@@ -1137,6 +1158,225 @@ webview {
   box-shadow: 0 2px 0 rgba(10, 132, 255, .7);
   border-radius: 0
 }
+
+/* ── DOSSIERS FAVORIS ── */
+.fav-folder {
+  cursor: pointer;
+  gap: 5px
+}
+
+.folder-chevron {
+  flex-shrink: 0;
+  color: rgba(255,255,255,.35);
+  transition: transform .15s ease
+}
+
+.fav-folder.open .folder-chevron {
+  transform: rotate(90deg)
+}
+
+.folder-icon-svg {
+  flex-shrink: 0;
+  color: #f4c030
+}
+
+.fav-indented {
+  padding-left: 22px
+}
+
+/* ── MODAL IMPORT FAVORIS ── */
+.import-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center
+}
+
+.import-modal {
+  background: #2c2c2e;
+  border-radius: 12px;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,.7)
+}
+
+.import-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.08)
+}
+
+.import-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  flex: 1
+}
+
+.import-found {
+  font-size: 11px;
+  color: rgba(255,255,255,.4)
+}
+
+.import-close-btn {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.45);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1
+}
+.import-close-btn:hover { background: rgba(255,255,255,.1); color: #fff }
+
+.import-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.06)
+}
+
+.import-search {
+  flex: 1;
+  background: rgba(255,255,255,.08);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+  padding: 6px 10px;
+  outline: none
+}
+.import-search::placeholder { color: rgba(255,255,255,.3) }
+.import-search:focus { background: rgba(255,255,255,.12) }
+
+.import-select-all-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(255,255,255,.5);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none
+}
+
+.import-list-wrap {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0
+}
+.import-list-wrap::-webkit-scrollbar { width: 4px }
+.import-list-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 2px }
+
+.import-list {
+  list-style: none;
+  padding: 6px 0
+}
+
+.import-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  cursor: pointer
+}
+.import-item:hover { background: rgba(255,255,255,.05) }
+
+.import-cb { accent-color: #0a84ff; flex-shrink: 0; cursor: pointer }
+
+.import-item-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0
+}
+
+.import-item-title {
+  font-size: 12px;
+  color: #e5e5e5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.import-item-url {
+  font-size: 10px;
+  color: rgba(255,255,255,.32);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px
+}
+
+.import-empty {
+  text-align: center;
+  color: rgba(255,255,255,.3);
+  font-size: 12px;
+  padding: 24px 16px
+}
+
+.import-empty-state {
+  padding: 24px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px
+}
+.import-empty-state p {
+  font-size: 13px;
+  color: rgba(255,255,255,.5);
+  line-height: 1.6
+}
+
+.import-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255,255,255,.08)
+}
+
+.import-count {
+  flex: 1;
+  font-size: 11px;
+  color: rgba(255,255,255,.4)
+}
+
+.import-cancel-btn {
+  background: rgba(255,255,255,.1);
+  border: none;
+  border-radius: 6px;
+  color: rgba(255,255,255,.7);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 12px
+}
+.import-cancel-btn:hover { background: rgba(255,255,255,.15) }
+
+.import-confirm-btn {
+  background: #0a84ff;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  transition: background .1s
+}
+.import-confirm-btn:disabled { opacity: .35; cursor: default }
+.import-confirm-btn:not(:disabled):hover { background: #0070d8 }
 
 #essentials-list.drag-target {
   outline: 1px dashed rgba(10, 132, 255, .35);
