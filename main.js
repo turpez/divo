@@ -151,6 +151,23 @@ const WEB_DARK_CSS = `
   img, video, picture, svg, canvas, iframe, embed,
   [style*="background-image"] { filter: invert(100%) hue-rotate(180deg) !important; }
 `
+// Sites ayant déjà un thème sombre natif — on n'applique pas le filtre
+const WEB_DARK_SKIP = [
+  'youtube.com', 'youtu.be',
+  'twitch.tv',
+  'google.com', 'google.fr', 'google.ca', 'google.co.uk', 'google.de',
+  'github.com', 'gitlab.com',
+  'discord.com', 'discordapp.com',
+  'twitter.com', 'x.com',
+  'netflix.com',
+  'spotify.com',
+  'reddit.com',
+  'notion.so',
+  'figma.com',
+  'linear.app',
+  'vercel.com',
+  'stackoverflow.com',
+]
 
 // ── Auto-update
 const REPO = 'bleathingman/divo'
@@ -322,7 +339,22 @@ app.whenReady().then(async () => {
           contents.executeJavaScript(TWITCH_AD_JS).catch(() => {})
         }
         if (config.webDarkMode && !url.startsWith('divo:') && !url.startsWith('chrome') && !url.startsWith('file')) {
-          contents.insertCSS(WEB_DARK_CSS).catch(() => {})
+          try {
+            const hostname = new URL(url).hostname.replace(/^www\./, '')
+            const skip = WEB_DARK_SKIP.some(h => hostname === h || hostname.endsWith('.' + h))
+            if (!skip) {
+              contents.insertCSS(WEB_DARK_CSS).catch(() => {})
+              // Annule le filtre si la page est déjà sombre (luminosité < 80)
+              contents.executeJavaScript(`(function(){
+                const bg = window.getComputedStyle(document.documentElement).backgroundColor
+                const m = bg.match(/\\d+/g)
+                if (m && m.length >= 3) {
+                  const lum = (+m[0]*299 + +m[1]*587 + +m[2]*114) / 1000
+                  if (lum < 80) document.documentElement.style.filter = ''
+                }
+              })()`).catch(() => {})
+            }
+          } catch {}
         }
       })
       contents.setWindowOpenHandler(({ url }) => {
