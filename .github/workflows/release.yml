@@ -22,6 +22,16 @@ jobs:
       - name: Build Linux
         run: npm run build:linux -- --publish never
       - name: Upload AppImage to release
-        run: gh release upload ${{ github.ref_name }} dist/*.AppImage --clobber
+        run: |
+          for i in $(seq 1 18); do
+            if gh release view ${{ github.ref_name }} > /dev/null 2>&1; then
+              gh release upload ${{ github.ref_name }} dist/*.AppImage --clobber
+              exit 0
+            fi
+            echo "Attempt $i: release not found, waiting 10s..."
+            sleep 10
+          done
+          echo "Release not found after 3 minutes, giving up"
+          exit 1
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
