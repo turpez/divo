@@ -23,15 +23,18 @@ jobs:
         run: npm run build:linux -- --publish never
       - name: Upload AppImage to release
         run: |
-          for i in $(seq 1 18); do
-            if gh release view ${{ github.ref_name }} > /dev/null 2>&1; then
-              gh release upload ${{ github.ref_name }} dist/*.AppImage --clobber
+          for i in $(seq 1 30); do
+            if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+              gh release upload "${{ github.ref_name }}" dist/*.AppImage --clobber
               exit 0
             fi
-            echo "Attempt $i: release not found, waiting 10s..."
-            sleep 10
+            echo "Attempt $i/30: release not found, waiting 20s..."
+            sleep 20
           done
-          echo "Release not found after 3 minutes, giving up"
-          exit 1
+          echo "Release not found after 10 min — creating fallback release..."
+          gh release create "${{ github.ref_name }}" \
+            --title "Divo ${{ github.ref_name }}" \
+            --notes "Linux AppImage" \
+            dist/*.AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
