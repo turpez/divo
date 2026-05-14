@@ -148,12 +148,136 @@ const TWITCH_AD_JS = `(function(){
   setInterval(checkAd, 1000);
 })()`
 
-// ── Web dark mode CSS
-const WEB_DARK_CSS = `
-  html { filter: invert(100%) hue-rotate(180deg) !important; }
-  img, video, picture, svg, canvas, iframe, embed,
-  [style*="background-image"] { filter: invert(100%) hue-rotate(180deg) !important; }
-`
+// ── Web dark mode dynamique (inspiré Dark Reader)
+function dynamicDark() {
+  'use strict'
+  if (document.getElementById('__dv_dm')) return
+
+  // Bail si le site est déjà sombre
+  const bodyEl = document.body || document.documentElement
+  if (bodyEl) {
+    const bg = window.getComputedStyle(bodyEl).backgroundColor
+    const m  = bg.match(/\d+/g)
+    if (m && m.length >= 3 && (+m[0]*299 + +m[1]*587 + +m[2]*114) / 255000 < 0.25) return
+  }
+  const metaCS = document.querySelector('meta[name="color-scheme"]')
+  if (metaCS && metaCS.content && metaCS.content.includes('dark')) return
+
+  // ── Utilitaires couleur ─────────────────────────────────────
+  function parse(str) {
+    if (!str) return null
+    str = str.trim()
+    if (!str || str==='transparent'||str==='inherit'||str==='initial'||
+        str==='unset'||str==='currentcolor'||str.startsWith('var(')) return null
+    let m
+    m = str.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/i)
+    if (m) return [+m[1],+m[2],+m[3],1]
+    m = str.match(/^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/i)
+    if (m) return [+m[1],+m[2],+m[3],+m[4]]
+    m = str.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i)
+    if (m) return [parseInt(m[1],16),parseInt(m[2],16),parseInt(m[3],16),1]
+    m = str.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i)
+    if (m) return [parseInt(m[1]+m[1],16),parseInt(m[2]+m[2],16),parseInt(m[3]+m[3],16),1]
+    if (str==='white') return [255,255,255,1]
+    if (str==='black') return [0,0,0,1]
+    return null
+  }
+
+  function toHsl(r,g,b) {
+    r/=255; g/=255; b/=255
+    const mx=Math.max(r,g,b), mn=Math.min(r,g,b), d=mx-mn
+    let h=0, s=0, l=(mx+mn)/2
+    if (d) {
+      s = l>.5 ? d/(2-mx-mn) : d/(mx+mn)
+      h = mx===r?(g-b)/d/6+(g<b?1:0):mx===g?(b-r)/d/6+1/3:(r-g)/d/6+2/3
+    }
+    return [h*360, s*100, l*100]
+  }
+
+  function fromHsl(h,s,l) {
+    h/=360; s/=100; l/=100
+    if (!s) { const v=Math.round(l*255); return [v,v,v] }
+    const q=l<.5?l*(1+s):l+s-l*s, p=2*l-q
+    const f=(t)=>{t=((t%1)+1)%1;if(t<1/6)return p+(q-p)*6*t;if(t<.5)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p}
+    return [Math.round(f(h+1/3)*255),Math.round(f(h)*255),Math.round(f(h-1/3)*255)]
+  }
+
+  function fmt(r,g,b,a) { return a<1?'rgba('+r+','+g+','+b+','+a.toFixed(2)+')':'rgb('+r+','+g+','+b+')' }
+
+  // ── Transformations ─────────────────────────────────────────
+  function txBg(c) {
+    if (!c||c[3]<0.05) return null
+    const [h,s,l]=toHsl(c[0],c[1],c[2])
+    if (l<22) return null
+    return fmt(...fromHsl(h, Math.min(s,50), 10+s*0.05), c[3])
+  }
+  function txText(c) {
+    if (!c||c[3]<0.05) return null
+    const [h,s,l]=toHsl(c[0],c[1],c[2])
+    if (l>65) return null
+    return fmt(...fromHsl(h, Math.min(s,20), 88), c[3])
+  }
+  function txBorder(c) {
+    if (!c||c[3]<0.05) return null
+    const [h,s,l]=toHsl(c[0],c[1],c[2])
+    if (l<30) return null
+    return fmt(...fromHsl(h, s*0.35, 28), c[3])
+  }
+
+  const cache = new Map()
+  function tx(val, fn, key) {
+    const k=val+'|'+key
+    if (cache.has(k)) return cache.get(k)
+    const r=fn(parse(val)); cache.set(k,r); return r
+  }
+
+  const BG=['background-color'], FG=['color'],
+        BD=['border-color','border-top-color','border-right-color','border-bottom-color','border-left-color','outline-color']
+
+  // ── Scan des feuilles de style ──────────────────────────────
+  function processRule(rule, lines) {
+    const sel=rule.selectorText
+    if (!sel||sel.includes(':-')||sel.includes('::-')) return
+    const st=rule.style, props={}
+    for (const p of BG) { const v=st.getPropertyValue(p); if(v){const d=tx(v,txBg,'bg');     if(d) props[p]=d} }
+    for (const p of FG) { const v=st.getPropertyValue(p); if(v){const d=tx(v,txText,'fg');   if(d) props[p]=d} }
+    for (const p of BD) { const v=st.getPropertyValue(p); if(v){const d=tx(v,txBorder,'bd'); if(d) props[p]=d} }
+    if (Object.keys(props).length)
+      lines.push(sel+'{'+Object.entries(props).map(([k,v])=>k+':'+v+' !important').join(';')+'}')
+  }
+
+  function buildCSS() {
+    const lines=[
+      'html{background:#121212!important;color:#e0e0e0!important;color-scheme:dark!important}',
+      'body{background-color:#121212!important;color:#e0e0e0!important}',
+      '::-webkit-scrollbar-track{background:#1a1a1a!important}',
+      '::-webkit-scrollbar-thumb{background:#444!important;border-radius:4px!important}',
+    ]
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of (sheet.cssRules||[])) {
+          if (rule.type===1) { try{processRule(rule,lines)}catch{} }
+          else if (rule.cssRules) { for (const r of rule.cssRules) if(r.type===1) try{processRule(r,lines)}catch{} }
+        }
+      } catch {}
+    }
+    return lines.join('\n')
+  }
+
+  const style=document.createElement('style')
+  style.id='__dv_dm'
+  document.head.appendChild(style)
+
+  function apply() { style.textContent=buildCSS() }
+  apply()
+
+  // Re-scan quand de nouveaux styles sont chargés
+  let t
+  new MutationObserver(()=>{clearTimeout(t);t=setTimeout(apply,300)}).observe(document.head,{childList:true})
+  setTimeout(apply,600)
+  setTimeout(apply,2000)
+}
+const WEB_DARK_JS = '(' + dynamicDark.toString() + ')()'
 // Sites ayant déjà un thème sombre natif — on n'applique pas le filtre
 const WEB_DARK_SKIP = [
   'youtube.com', 'youtu.be',
@@ -365,48 +489,26 @@ app.whenReady().then(async () => {
         }
       })
       contents.on('did-finish-load', () => {
-        if (!config.adblock) return
         const url = contents.getURL()
         if (!url || url.startsWith('chrome') || url.startsWith('arc') || url.startsWith('file')) return
-        contents.insertCSS(GENERIC_AD_CSS).catch(() => {})
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-          contents.insertCSS(YT_AD_CSS).catch(() => {})
-          contents.executeJavaScript(YT_AD_JS).catch(() => {})
+
+        if (config.adblock) {
+          contents.insertCSS(GENERIC_AD_CSS).catch(() => {})
+          if (url.includes('youtube.com') || url.includes('youtu.be')) {
+            contents.insertCSS(YT_AD_CSS).catch(() => {})
+            contents.executeJavaScript(YT_AD_JS).catch(() => {})
+          }
+          if (url.includes('twitch.tv')) {
+            contents.insertCSS(TWITCH_AD_CSS).catch(() => {})
+            contents.executeJavaScript(TWITCH_AD_JS).catch(() => {})
+          }
         }
-        if (url.includes('twitch.tv')) {
-          contents.insertCSS(TWITCH_AD_CSS).catch(() => {})
-          contents.executeJavaScript(TWITCH_AD_JS).catch(() => {})
-        }
-        if (config.webDarkMode && !url.startsWith('divo:') && !url.startsWith('chrome') && !url.startsWith('file')) {
+
+        if (config.webDarkMode && !url.startsWith('divo:')) {
           try {
             const hostname = new URL(url).hostname.replace(/^www\./, '')
             const skip = WEB_DARK_SKIP.some(h => hostname === h || hostname.endsWith('.' + h))
-            if (!skip) {
-              contents.insertCSS(WEB_DARK_CSS).catch(() => {})
-              contents.executeJavaScript(`(function(){
-                function disable() {
-                  document.documentElement.style.setProperty('filter', 'none', 'important')
-                }
-                function check() {
-                  for (const el of [document.body, document.documentElement]) {
-                    if (!el) continue
-                    const bg = window.getComputedStyle(el).backgroundColor
-                    const m = bg.match(/\\d+/g)
-                    if (!m || m.length < 3) continue
-                    const alpha = m[3] !== undefined ? parseFloat(m[3]) : 1
-                    if (alpha < 0.1) continue
-                    const lum = (+m[0]*299 + +m[1]*587 + +m[2]*114) / 1000
-                    if (lum < 80) { disable(); return true }
-                  }
-                  const meta = document.querySelector('meta[name="color-scheme"]')
-                  if (meta && meta.content && meta.content.includes('dark')) { disable(); return true }
-                  const bigImgs = Array.from(document.images).filter(i => i.width > 150 && i.height > 150)
-                  if (bigImgs.length > 5) { disable(); return true }
-                  return false
-                }
-                if (!check()) setTimeout(check, 1000)
-              })()`).catch(() => {})
-            }
+            if (!skip) contents.executeJavaScript(WEB_DARK_JS).catch(() => {})
           } catch {}
         }
       })
