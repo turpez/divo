@@ -20,9 +20,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libarchive-tools rpm fakeroot
       - run: npm install
       - name: Build Linux
-        run: npm run build:linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:linux -- --publish never
       - name: Upload AppImage to release
         run: gh release upload ${{ github.ref_name }} dist/*.AppImage --clobber
         env:

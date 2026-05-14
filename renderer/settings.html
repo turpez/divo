@@ -257,7 +257,23 @@
       </div>
     </div>
 
-    <p class="version-text">Divo 1.0.9 — fait avec ❤️</p>
+    <div class="section">
+      <div class="section-title">Apparence web</div>
+      <div class="card">
+        <div class="setting-row">
+          <div>
+            <div class="setting-label">Mode sombre pour les sites</div>
+            <div class="setting-desc">Applique un thème sombre sur tous les sites web</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="web-dark-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <p class="version-text">Divo 1.0.10 — fait avec ❤️</p>
   </div>
 
   <script>
@@ -293,6 +309,9 @@
     if (dlDisplay && window.__divoDlPath) dlDisplay.textContent = window.__divoDlPath
     document.getElementById('btn-pick-download').addEventListener('click', function() {
       document.title = 'divo-action:pick-download-path:' + Date.now()
+    })
+    document.getElementById('web-dark-toggle').addEventListener('change', function() {
+      document.title = 'divo-action:web-dark:' + this.checked
     })
   </script>
 </body>

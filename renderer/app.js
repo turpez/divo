@@ -168,8 +168,9 @@ let currentLayout   = 'sidebar'
 // HELPERS
 // ============================================================
 
-function isNewtab(url)   { return !url || url === NEWTAB_URL || url.includes('newtab.html') }
-function isSettings(url) { return url === SETTINGS_URL || url.includes('settings.html') }
+function stripSlash(u) { return (u || '').replace(/\/+$/, '') }
+function isNewtab(url)   { const u = stripSlash(url); return !url || u === NEWTAB_URL || url.includes('newtab.html') }
+function isSettings(url) { const u = stripSlash(url); return u === SETTINGS_URL || url.includes('settings.html') }
 function isSpecial(url)  { return isNewtab(url) || isSettings(url) }
 function displayUrl(url) { return isSpecial(url) ? '' : url }
 
@@ -331,7 +332,6 @@ function applyTheme(theme) {
   localStorage.setItem('divo-theme', theme)
   window.bridge.setTheme(theme)
 }
-
 
 // ============================================================
 // NAVIGATION
@@ -1704,12 +1704,15 @@ webview.addEventListener('did-navigate', e => {
       const ss = localStorage.getItem('divo-save-session')  || 'yes'
       const aa = localStorage.getItem('divo-auto-archive')  || 'off'
       const ab = await window.bridge.adblockStatus()
+      const wdm = await window.bridge.webDarkModeStatus()
       webview.executeJavaScript(`
         document.getElementById('search-engine').value    = ${JSON.stringify(se)};
         document.getElementById('homepage').value          = ${JSON.stringify(hp)};
         document.getElementById('save-session').value     = ${JSON.stringify(ss)};
         document.getElementById('auto-archive').value     = ${JSON.stringify(aa)};
         document.getElementById('adblock-toggle').checked = ${!!ab};
+        const wdt = document.getElementById('web-dark-toggle');
+        if (wdt) wdt.checked = ${!!wdm};
       `).catch(() => {})
     }, 300)
   }
@@ -1733,10 +1736,10 @@ webview.addEventListener('page-title-updated', e => {
       // page web normale, ne pas traiter — tomber vers la mise à jour du titre
     } else {
       const action = e.title.replace('divo-action:', '')
-      if (action === 'ext-install') window.bridge.extInstall()
       if (action.startsWith('adblock:')) window.bridge.adblockToggle(action.endsWith('true'))
       if (action.startsWith('theme:'))  applyTheme(action.replace('theme:', ''))
       if (action.startsWith('layout:')) applyLayout(action.replace('layout:', ''))
+      if (action.startsWith('web-dark:')) window.bridge.webDarkModeToggle(action.endsWith('true'))
       if (action.startsWith('pick-download-path')) {
         window.bridge.pickDownloadPath().then(newPath => {
           if (!newPath || !webviewReady) return
@@ -1945,3 +1948,4 @@ updateInstallBtn.addEventListener('click', async () => {
 updateDismissBtn.addEventListener('click', () => {
   updateBar.classList.remove('visible')
 })
+

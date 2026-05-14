@@ -27,7 +27,7 @@ const WEBVIEW_SHORTCUTS = new Set([
 
 // ── Config persistante
 const configPath = path.join(app.getPath('userData'), 'config.json')
-let config = { adblock: true }
+let config = { adblock: true, webDarkMode: false }
 try { Object.assign(config, JSON.parse(fs.readFileSync(configPath, 'utf-8'))) } catch {}
 function saveConfig() { try { fs.writeFileSync(configPath, JSON.stringify(config)) } catch (e) { console.error('saveConfig error', e) } }
 
@@ -127,38 +127,30 @@ const YT_AD_JS = `(function(){
   skip();
 })()`
 
-// ── Extensions
-const extensionsDir = path.join(app.getPath('userData'), 'extensions')
-if (!fs.existsSync(extensionsDir)) fs.mkdirSync(extensionsDir, { recursive: true })
-
-function copyDirSync(src, dest) {
-  fs.mkdirSync(dest, { recursive: true })
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, entry.name)
-    const d = path.join(dest, entry.name)
-    entry.isDirectory() ? copyDirSync(s, d) : fs.copyFileSync(s, d)
+// ── Twitch ad blocker
+const TWITCH_AD_CSS = `
+  .video-ad-label, .tw-c-text-overlay, .ad-banner, .tw-ad,
+  div[data-a-target="video-ad-countdown"], .stream-chat-header ~ .tw-pd-1,
+  .player-ad-overlay, .tw-popover__bubble[style*="opacity: 1"] { display: none !important; }
+`
+const TWITCH_AD_JS = `(function(){
+  if (window.__dv_tw) return; window.__dv_tw = 1;
+  let adMuted = false;
+  function checkAd() {
+    const adBanner = document.querySelector('.video-ad-label, [data-a-target="video-ad-countdown"]');
+    const vid = document.querySelector('video');
+    if (adBanner && vid && !adMuted) { vid.muted = true; adMuted = true; }
+    else if (!adBanner && vid && adMuted) { vid.muted = false; adMuted = false; }
   }
-}
+  setInterval(checkAd, 1000);
+})()`
 
-function getExtIcon(ext) {
-  const action = ext.manifest.browser_action || ext.manifest.action
-  const icons = action?.default_icon || ext.manifest.icons
-  if (!icons) return null
-  if (typeof icons === 'string') return `chrome-extension://${ext.id}/${icons}`
-  const size = icons['16'] || icons['19'] || icons['32'] || icons['48'] || Object.values(icons)[0]
-  return `chrome-extension://${ext.id}/${size}`
-}
-
-function serializeExt(ext) {
-  return {
-    id: ext.id,
-    name: ext.name,
-    version: ext.manifest.version || '?',
-    icon: getExtIcon(ext),
-    hasPopup: !!(ext.manifest.browser_action?.default_popup || ext.manifest.action?.default_popup),
-    popupPath: ext.manifest.browser_action?.default_popup || ext.manifest.action?.default_popup || null,
-  }
-}
+// ── Web dark mode CSS
+const WEB_DARK_CSS = `
+  html { filter: invert(93%) hue-rotate(180deg) !important; }
+  img, video, picture, svg, canvas, iframe, embed,
+  [style*="background-image"] { filter: invert(100%) hue-rotate(180deg) !important; }
+`
 
 // ── Auto-update
 const REPO = 'bleathingman/divo'
@@ -251,13 +243,6 @@ app.whenReady().then(async () => {
   initBlocklist()
   setupAdblocker()
 
-  // ── Charger les extensions installées
-  const extSubdirs = fs.readdirSync(extensionsDir, { withFileTypes: true })
-    .filter(d => d.isDirectory()).map(d => path.join(extensionsDir, d.name))
-  for (const extPath of extSubdirs) {
-    try { await session.defaultSession.loadExtension(extPath, { allowFileAccess: true }) }
-    catch (e) { console.error('Extension load failed:', extPath, e.message) }
-  }
   // ── Protocole divo://
   protocol.handle('divo', (request) => {
     const url = new URL(request.url)
@@ -267,7 +252,7 @@ app.whenReady().then(async () => {
     if (file) {
       const theme = config.theme || 'dark'
       const dlPath = JSON.stringify(config.downloadPath || app.getPath('downloads'))
-      const inject = `<script>document.documentElement.setAttribute('data-theme','${theme}');window.__divoDlPath=${dlPath};<\/script>`
+      const inject = `<script>document.documentElement.setAttribute('data-theme',${JSON.stringify(theme)});window.__divoDlPath=${dlPath};<\/script>`
       const html = fs.readFileSync(path.join(__dirname, 'renderer', file), 'utf-8')
         .replace('<head>', '<head>' + inject)
       return new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } })
@@ -332,6 +317,13 @@ app.whenReady().then(async () => {
           contents.insertCSS(YT_AD_CSS).catch(() => {})
           contents.executeJavaScript(YT_AD_JS).catch(() => {})
         }
+        if (url.includes('twitch.tv')) {
+          contents.insertCSS(TWITCH_AD_CSS).catch(() => {})
+          contents.executeJavaScript(TWITCH_AD_JS).catch(() => {})
+        }
+        if (config.webDarkMode && !url.startsWith('divo:') && !url.startsWith('chrome') && !url.startsWith('file')) {
+          contents.insertCSS(WEB_DARK_CSS).catch(() => {})
+        }
       })
       contents.setWindowOpenHandler(({ url }) => {
         if (config.adblock && url) {
@@ -393,63 +385,12 @@ ipcMain.handle('pick-download-path', async () => {
   return filePaths[0]
 })
 
-// ── Extensions IPC
-ipcMain.handle('ext-list', () => session.defaultSession.getAllExtensions().map(serializeExt))
-
-ipcMain.handle('ext-install', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
-    title: 'Sélectionner le dossier de l\'extension',
-    properties: ['openDirectory'],
-  })
-  if (canceled || !filePaths.length) return { error: 'cancelled' }
-  const src = filePaths[0]
-  const manifestPath = path.join(src, 'manifest.json')
-  if (!fs.existsSync(manifestPath)) return { error: 'no-manifest' }
-  let manifest
-  try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) }
-  catch { return { error: 'invalid-manifest' } }
-  const safeName = (manifest.name || 'extension').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40)
-  const dest = path.join(extensionsDir, safeName + '_' + Date.now())
-  try {
-    copyDirSync(src, dest)
-    const ext = await session.defaultSession.loadExtension(dest, { allowFileAccess: true })
-    return { success: true, ext: serializeExt(ext) }
-  } catch (e) {
-    try { fs.rmSync(dest, { recursive: true, force: true }) } catch {}
-    return { error: e.message }
-  }
-})
-
-ipcMain.handle('ext-remove', (_, extId) => {
-  const ext = session.defaultSession.getAllExtensions().find(e => e.id === extId)
-  if (!ext) return { error: 'not-found' }
-  const extPath = ext.path
-  session.defaultSession.removeExtension(extId)
-  try { fs.rmSync(extPath, { recursive: true, force: true }) } catch {}
-  return { success: true }
-})
-
-ipcMain.handle('ext-popup', (_, extId, x, y) => {
-  const ext = session.defaultSession.getAllExtensions().find(e => e.id === extId)
-  if (!ext) return
-  const popupPath = ext.manifest.browser_action?.default_popup || ext.manifest.action?.default_popup
-  if (!popupPath) return
-  const popup = new BrowserWindow({
-    width: 380, height: 550, x, y,
-    frame: false, resizable: false, show: false,
-    parent: mainWindow, modal: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: false },
-  })
-  popup.loadURL(`chrome-extension://${extId}/${popupPath}`)
-  popup.webContents.once('did-finish-load', () => {
-    popup.webContents.executeJavaScript(
-      '[document.body.scrollWidth, document.body.scrollHeight]'
-    ).then(([w, h]) => {
-      popup.setSize(Math.max(200, Math.min(800, w || 380)), Math.max(80, Math.min(600, h || 400)))
-      popup.show()
-    }).catch(() => popup.show())
-  })
-  popup.on('blur', () => popup.close())
+// ── Web Dark Mode IPC
+ipcMain.handle('web-dark-mode-status', () => config.webDarkMode)
+ipcMain.handle('web-dark-mode-toggle', (_, enabled) => {
+  config.webDarkMode = !!enabled
+  saveConfig()
+  return config.webDarkMode
 })
 
 // ── Import bookmarks depuis fichier .htm

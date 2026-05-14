@@ -77,9 +77,9 @@
         <path d="M21 7v2M21 15v2"/>
       </svg>
     </button>
-    <button class="action-btn" id="btn-ext" title="Extensions">
+    <button class="action-btn" id="btn-dark" title="Mode sombre web">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <path d="M20.5 11H19V7a2 2 0 0 0-2-2h-4V3.5a2.5 2.5 0 0 0-5 0V5H4a2 2 0 0 0-2 2v3.5h1.5a2.5 2.5 0 0 1 0 5H2V20a2 2 0 0 0 2 2h3.5v-1.5a2.5 2.5 0 0 1 5 0V22H17a2 2 0 0 0 2-2v-4h1.5a2.5 2.5 0 0 0 0-5z"/>
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
       </svg>
     </button>
     <button class="action-btn" id="btn-settings" title="Paramètres">
@@ -145,8 +145,8 @@
       window.location.href = 'divo://settings'
     })
 
-    document.getElementById('btn-ext').addEventListener('click', () => {
-      document.title = 'divo-action:ext-install'
+    document.getElementById('btn-dark').addEventListener('click', () => {
+      window.location.href = 'divo://settings'
     })
   </script>
 </body>
