@@ -15,6 +15,9 @@ let mainWindow
 const downloadItems = new Map()
 const pendingPerms  = new Map()
 
+// Protocoles autorisés dans le webview — tout le reste → shell.openExternal()
+const SAFE_PROTOS = new Set(['http:', 'https:', 'divo:', 'file:', 'chrome:'])
+
 const WEBVIEW_SHORTCUTS = new Set([
   'ctrl+KeyT', 'ctrl+shift+KeyT', 'ctrl+shift+KeyN', 'ctrl+KeyW',
   'ctrl+KeyL', 'ctrl+KeyR', 'ctrl+shift+KeyR', 'ctrl+KeyF',
@@ -147,7 +150,7 @@ const TWITCH_AD_JS = `(function(){
 
 // ── Web dark mode CSS
 const WEB_DARK_CSS = `
-  html { filter: invert(93%) hue-rotate(180deg) !important; }
+  html { filter: invert(100%) hue-rotate(180deg) !important; }
   img, video, picture, svg, canvas, iframe, embed,
   [style*="background-image"] { filter: invert(100%) hue-rotate(180deg) !important; }
 `
@@ -167,6 +170,21 @@ const WEB_DARK_SKIP = [
   'linear.app',
   'vercel.com',
   'stackoverflow.com',
+  'roblox.com',
+  'steampowered.com',
+  'epicgames.com',
+  'ea.com',
+  'ubisoft.com',
+  'blizzard.com',
+  'battle.net',
+  'instagram.com',
+  'pinterest.com',
+  'behance.net',
+  'dribbble.com',
+  'deviantart.com',
+  'artstation.com',
+  'unsplash.com',
+  'imgur.com',
 ]
 
 // ── Auto-update
@@ -326,6 +344,17 @@ app.whenReady().then(async () => {
   // ── Nouvelles fenêtres → onglets + injection pub
   app.on('web-contents-created', (_, contents) => {
     if (contents.getType() === 'webview') {
+      // Liens custom protocol (steam://, discord://, epic://, etc.) → ouvrir dans l'OS
+      contents.on('will-navigate', (event, url) => {
+        try {
+          const proto = new URL(url).protocol
+          if (!SAFE_PROTOS.has(proto) && !proto.startsWith('chrome-extension')) {
+            event.preventDefault()
+            shell.openExternal(url).catch(() => {})
+          }
+        } catch {}
+      })
+
       contents.on('before-input-event', (event, input) => {
         if (input.type !== 'keyDown' || !mainWindow) return
         const mod = input.control || input.meta
@@ -355,26 +384,40 @@ app.whenReady().then(async () => {
             if (!skip) {
               contents.insertCSS(WEB_DARK_CSS).catch(() => {})
               contents.executeJavaScript(`(function(){
-                function isDark() {
+                function disable() {
+                  document.documentElement.style.setProperty('filter', 'none', 'important')
+                }
+                function check() {
                   for (const el of [document.body, document.documentElement]) {
                     if (!el) continue
                     const bg = window.getComputedStyle(el).backgroundColor
                     const m = bg.match(/\\d+/g)
                     if (!m || m.length < 3) continue
-                    const alpha = m[3] !== undefined ? +m[3] : 1
+                    const alpha = m[3] !== undefined ? parseFloat(m[3]) : 1
                     if (alpha < 0.1) continue
                     const lum = (+m[0]*299 + +m[1]*587 + +m[2]*114) / 1000
-                    if (lum < 80) { document.documentElement.style.filter = ''; return true }
+                    if (lum < 80) { disable(); return true }
                   }
+                  const meta = document.querySelector('meta[name="color-scheme"]')
+                  if (meta && meta.content && meta.content.includes('dark')) { disable(); return true }
+                  const bigImgs = Array.from(document.images).filter(i => i.width > 150 && i.height > 150)
+                  if (bigImgs.length > 5) { disable(); return true }
                   return false
                 }
-                if (!isDark()) setTimeout(isDark, 1000)
+                if (!check()) setTimeout(check, 1000)
               })()`).catch(() => {})
             }
           } catch {}
         }
       })
       contents.setWindowOpenHandler(({ url }) => {
+        try {
+          const proto = new URL(url).protocol
+          if (!SAFE_PROTOS.has(proto) && !proto.startsWith('chrome-extension')) {
+            shell.openExternal(url).catch(() => {})
+            return { action: 'deny' }
+          }
+        } catch {}
         if (config.adblock && url) {
           try {
             const parts = new URL(url).hostname.toLowerCase().split('.')

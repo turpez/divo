@@ -356,6 +356,8 @@ function normalizeUrl(raw) {
   if (raw === 'divo://settings') return SETTINGS_URL
   if (raw.startsWith('divo://') || raw.startsWith('file://') ||
     raw.startsWith('http://') || raw.startsWith('https://')) return raw
+  // Protocoles custom (steam://, discord://, epic://, etc.) → passés tels quels
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) return raw
   if (/^[\w-]+\.[\w.-]+/.test(raw) && !raw.includes(' ')) return 'https://' + raw
   return getSearchUrl(raw)
 }
