@@ -12,10 +12,14 @@ const SETTINGS_URL = window.bridge.settingsUrl
 // ── DOM
 const webview          = document.getElementById('webview')
 const webviewPrivate   = document.getElementById('webview-private')
+const webviewBg        = document.getElementById('webview-bg')
 const updateBar        = document.getElementById('update-bar')
 const updateMsg        = document.getElementById('update-msg')
 const updateInstallBtn = document.getElementById('update-install-btn')
 const updateDismissBtn = document.getElementById('update-dismiss-btn')
+const miniPlayer       = document.getElementById('mini-player')
+const miniPlayerFav    = document.getElementById('mini-player-favicon')
+const miniPlayerTitle  = document.getElementById('mini-player-title')
 const urlInput      = document.getElementById('url-input')
 const btnBack       = document.getElementById('btn-back')
 const btnForward    = document.getElementById('btn-forward')
@@ -75,8 +79,12 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-// SEC-001 — retourne le webview actif (normal ou privé)
-function wv() { return activeTabIsPrivate() ? webviewPrivate : webview }
+// SEC-001 — retourne le webview actif (normal, privé, ou arrière-plan media)
+function wv() {
+  if (activeTabIsPrivate()) return webviewPrivate
+  if (mediaPreserved) return webviewBg
+  return webview
+}
 
 // ── Virtual list — rend uniquement les items visibles
 const ITEM_H = 30
@@ -159,6 +167,10 @@ let resizeStartX    = 0
 let resizeStartW    = 0
 let globalMuted     = false
 let globalPlaying   = false
+let mediaTabId        = null   // onglet qui joue actuellement
+let mediaEssentialId  = null   // essential qui joue actuellement
+let mediaPreserved    = false  // true quand le tab media tourne en arrière-plan dans webview
+let webviewBgReady    = false
 let pendingPermKey  = null
 let currentTheme    = 'dark'
 let currentLayout   = 'sidebar'
@@ -263,6 +275,7 @@ function loadState() {
       archived: t.archived || false,
       scrollY:  t.scrollY  || 0,
       unloaded: t.unloaded || false,
+      playing:  false,   // toujours réinitialiser au démarrage
     }))
     if (!tabs.length) {
       tabs = [{ id: 't_default', title: 'Nouvel onglet', url: NEWTAB_URL, favicon: null, spaceId: spaces[0].id, lastUsed: Date.now(), archived: false }]
@@ -350,12 +363,38 @@ function normalizeUrl(raw) {
 function navigate(url) {
   url = normalizeUrl(url)
   syncUrlBars(displayUrl(url))
+
   const isPriv = activeTabIsPrivate()
-  webview.style.display        = isPriv ? 'none' : ''
-  webviewPrivate.style.display = isPriv ? '' : 'none'
-  const w = isPriv ? webviewPrivate : webview
-  if (webviewReady) w.loadURL(url).catch(() => {})
-  else w.src = url
+  const goingBack = mediaPreserved && (
+    (mediaTabId && activeTabId === mediaTabId && !activeEssentialId) ||
+    (mediaEssentialId && activeEssentialId === mediaEssentialId)
+  )
+
+  if (goingBack) {
+    webview.style.display        = ''
+    webviewBg.style.display      = 'none'
+    webviewPrivate.style.display = 'none'
+    mediaPreserved = false
+    // NE PAS naviguer — webview a déjà la page chargée
+  } else if (isPriv) {
+    webview.style.display        = 'none'
+    webviewBg.style.display      = 'none'
+    webviewPrivate.style.display = ''
+    if (webviewReady) webviewPrivate.loadURL(url).catch(() => {})
+    else webviewPrivate.src = url
+  } else if (mediaPreserved) {
+    webview.style.display        = 'none'
+    webviewPrivate.style.display = 'none'
+    webviewBg.style.display      = ''
+    if (webviewBgReady) webviewBg.loadURL(url).catch(e => { if (e?.code !== 'ERR_ABORTED') console.error(e) })
+    else webviewBg.src = url
+  } else {
+    webview.style.display        = ''
+    webviewBg.style.display      = 'none'
+    webviewPrivate.style.display = 'none'
+    if (webviewReady) webview.loadURL(url).catch(() => {})
+    else webview.src = url
+  }
   saveState()
 }
 
@@ -390,6 +429,16 @@ function updateMuteBtn() {
   }
 }
 
+function updateMiniPlayer() {
+  const playing = tabs.find(t => t.playing)
+  if (!playing) { miniPlayer.classList.remove('visible'); return }
+  miniPlayerFav.src = playing.favicon || ''
+  miniPlayerFav.style.display = playing.favicon ? '' : 'none'
+  miniPlayerTitle.textContent = playing.title || 'En cours de lecture'
+  miniPlayer.dataset.tabId = playing.id
+  miniPlayer.classList.add('visible')
+}
+
 
 // ============================================================
 // ONGLETS
@@ -403,6 +452,15 @@ function activateTab(id) {
   t.lastUsed = Date.now()
   t._resumeScroll = !!(t.scrollY && t.scrollY > 0 && !t.unloaded)
   if (t.unloaded) t.unloaded = false
+
+  // Gestion preservation media
+  const prevTabId = activeTabId
+  const prevEssId = activeEssentialId
+  const leavingMediaTab = mediaTabId && prevTabId === mediaTabId && id !== mediaTabId
+  const leavingMediaEss = mediaEssentialId && prevEssId === mediaEssentialId
+  if (leavingMediaTab || leavingMediaEss) mediaPreserved = true
+  if (mediaTabId && id === mediaTabId) mediaPreserved = false
+
   activeTabId = id; activeEssentialId = null
   navigate(t.url)
   if (wasEssential) renderEssentials()
@@ -497,6 +555,12 @@ function pinTabAsEssential(id) {
 function activateEssential(id) {
   const e = essentials.find(x => x.id === id); if (!e) return
   const wasTab = !!activeTabId
+  const prevTabId = activeTabId
+  const prevEssId = activeEssentialId
+  const leavingMediaTab = mediaTabId && prevTabId === mediaTabId
+  const leavingMediaEss = mediaEssentialId && prevEssId === mediaEssentialId && prevEssId !== id
+  if (leavingMediaTab || leavingMediaEss) mediaPreserved = true
+  if (mediaEssentialId && id === mediaEssentialId) mediaPreserved = false
   activeEssentialId = id; activeTabId = null
   navigate(e.url)
   renderEssentials()
@@ -1790,18 +1854,18 @@ webview.addEventListener('found-in-page', e => {
 
 webview.addEventListener('media-started-playing', () => {
   globalPlaying = true; updateMuteBtn()
-  if (activeTabId && !activeEssentialId) {
-    const tab = tabs.find(t => t.id === activeTabId)
-    if (tab && !tab.playing) { tab.playing = true; renderTabs() }
-  }
+  mediaTabId       = activeEssentialId ? null : activeTabId
+  mediaEssentialId = activeEssentialId || null
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab && !tab.playing) { tab.playing = true; renderTabs() } }
+  updateMiniPlayer()
 })
 
 webview.addEventListener('media-paused', () => {
   globalPlaying = false; updateMuteBtn()
-  if (activeTabId && !activeEssentialId) {
-    const tab = tabs.find(t => t.id === activeTabId)
-    if (tab && tab.playing) { tab.playing = false; renderTabs() }
-  }
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab) { tab.playing = false; renderTabs() } mediaTabId = null }
+  mediaEssentialId = null
+  if (mediaPreserved) { mediaPreserved = false; webview.style.display = ''; webviewBg.style.display = 'none' }
+  updateMiniPlayer()
 })
 
 webview.addEventListener('new-window', e => {
@@ -1868,19 +1932,18 @@ webviewPrivate.addEventListener('page-favicon-updated', e => {
 webviewPrivate.addEventListener('media-started-playing', () => {
   if (!activeTabIsPrivate()) return
   globalPlaying = true; updateMuteBtn()
-  if (activeTabId && !activeEssentialId) {
-    const tab = tabs.find(t => t.id === activeTabId)
-    if (tab && !tab.playing) { tab.playing = true; renderTabs() }
-  }
+  mediaTabId = activeEssentialId ? null : activeTabId
+  mediaEssentialId = activeEssentialId || null
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab && !tab.playing) { tab.playing = true; renderTabs() } }
+  updateMiniPlayer()
 })
 
 webviewPrivate.addEventListener('media-paused', () => {
   if (!activeTabIsPrivate()) return
   globalPlaying = false; updateMuteBtn()
-  if (activeTabId && !activeEssentialId) {
-    const tab = tabs.find(t => t.id === activeTabId)
-    if (tab && tab.playing) { tab.playing = false; renderTabs() }
-  }
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab) { tab.playing = false; renderTabs() } mediaTabId = null }
+  mediaEssentialId = null
+  updateMiniPlayer()
 })
 
 webviewPrivate.addEventListener('found-in-page', e => {
@@ -1893,6 +1956,62 @@ webviewPrivate.addEventListener('found-in-page', e => {
 webviewPrivate.addEventListener('new-window', e => {
   if (e.disposition === 'save-to-disk') return
   e.preventDefault(); if (e.url) createTab(e.url, true)
+})
+
+
+// ============================================================
+// ÉVÉNEMENTS — WEBVIEW-BG (media arrière-plan)
+// ============================================================
+
+webviewBg.addEventListener('dom-ready', () => { webviewBgReady = true })
+webviewBg.addEventListener('did-start-loading', () => {
+  if (wv() !== webviewBg) return
+  isLoading = true; btnReload.innerHTML = ICON_STOP; startProgress()
+})
+webviewBg.addEventListener('did-stop-loading', () => {
+  if (wv() !== webviewBg) return
+  isLoading = false; btnReload.innerHTML = ICON_RELOAD; completeProgress(); updateNavButtons()
+})
+webviewBg.addEventListener('did-navigate', e => {
+  if (wv() !== webviewBg) return
+  syncUrlBars(displayUrl(e.url))
+  if (activeTabId && !activeEssentialId) {
+    const tab = tabs.find(t => t.id === activeTabId)
+    if (tab) { tab.url = e.url; saveState() }
+  }
+  updateNavButtons()
+})
+webviewBg.addEventListener('did-navigate-in-page', e => {
+  if (!e.isMainFrame || wv() !== webviewBg) return
+  syncUrlBars(displayUrl(e.url))
+})
+webviewBg.addEventListener('page-title-updated', e => {
+  if (wv() !== webviewBg || e.title.startsWith('divo-')) return
+  if (!activeTabId || activeEssentialId) return
+  const tab = tabs.find(t => t.id === activeTabId)
+  if (tab && !isSpecial(tab.url) && tab.title !== e.title) { tab.title = e.title; saveState(); renderTabs() }
+})
+webviewBg.addEventListener('page-favicon-updated', e => {
+  if (wv() !== webviewBg || !e.favicons?.length || !activeTabId || activeEssentialId) return
+  const tab = tabs.find(t => t.id === activeTabId)
+  if (tab && !isSpecial(tab.url) && tab.favicon !== e.favicons[0]) {
+    tab.favicon = e.favicons[0]; saveState(); renderTabs()
+  }
+})
+webviewBg.addEventListener('new-window', e => {
+  if (e.disposition === 'save-to-disk') return
+  e.preventDefault(); if (e.url) createTab(e.url)
+})
+webviewBg.addEventListener('media-started-playing', () => {
+  mediaTabId = activeEssentialId ? null : activeTabId
+  mediaEssentialId = activeEssentialId || null
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab && !tab.playing) { tab.playing = true; renderTabs() } }
+  globalPlaying = true; updateMuteBtn(); updateMiniPlayer()
+})
+webviewBg.addEventListener('media-paused', () => {
+  if (mediaTabId) { const tab = tabs.find(t => t.id === mediaTabId); if (tab) { tab.playing = false; renderTabs() } mediaTabId = null }
+  mediaEssentialId = null
+  globalPlaying = false; updateMuteBtn(); updateMiniPlayer()
 })
 
 
@@ -1947,5 +2066,43 @@ updateInstallBtn.addEventListener('click', async () => {
 
 updateDismissBtn.addEventListener('click', () => {
   updateBar.classList.remove('visible')
+})
+
+// ── Mini player controls
+document.getElementById('mini-player-pip').addEventListener('click', () => {
+  if (!webviewReady) return
+  wv().executeJavaScript(`(function(){
+    try {
+      const v = Array.from(document.querySelectorAll('video')).find(v => !v.paused) || document.querySelector('video')
+      if (v && document.pictureInPictureEnabled) v.requestPictureInPicture().catch(function(){})
+    } catch(e) {}
+  })()`, true).catch(() => {})
+})
+document.getElementById('mini-player-go').addEventListener('click', () => {
+  const id = miniPlayer.dataset.tabId
+  if (id) activateTab(id)
+})
+
+// ── Drag onglets → favoris
+favoritesList.addEventListener('dragover', e => {
+  if (dragType !== 'tab') return
+  e.preventDefault()
+  favoritesList.classList.add('drag-target')
+})
+favoritesList.addEventListener('dragleave', e => {
+  if (!favoritesList.contains(e.relatedTarget)) favoritesList.classList.remove('drag-target')
+})
+favoritesList.addEventListener('drop', e => {
+  e.preventDefault()
+  favoritesList.classList.remove('drag-target')
+  clearDragStyles()
+  if (dragType !== 'tab') return
+  const tab = tabs.find(t => t.id === dragId)
+  if (!tab || isSpecial(tab.url) || tab.private) return
+  if (!favorites.find(f => f.url === tab.url && f.spaceId === activeSpaceId)) {
+    favorites.push({ id: 'f' + Date.now(), title: tab.title || tab.url, url: tab.url, favicon: tab.favicon || null, spaceId: activeSpaceId })
+    saveState()
+    renderFavorites()
+  }
 })
 

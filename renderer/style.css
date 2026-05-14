@@ -586,6 +586,34 @@ body.private-active .nav-row .nav-btn:hover:not(:disabled) {
   margin: 6px 10px
 }
 
+/* ── MINI PLAYER ── */
+.mini-player {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin: 4px 6px;
+  background: #1c1c1e;
+  border-radius: 10px;
+  border: 1px solid #2c2c2e;
+  min-width: 0;
+}
+.mini-player.visible { display: flex; }
+.mini-player-favicon { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+.mini-player-title { flex: 1; font-size: 11px; color: #aeaeb2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mini-player-controls { display: flex; gap: 2px; flex-shrink: 0; }
+.mini-player-btn {
+  width: 22px; height: 22px;
+  border: none; background: none;
+  border-radius: 5px; cursor: pointer;
+  color: #636366;
+  display: flex; align-items: center; justify-content: center;
+}
+.mini-player-btn:hover { background: #2c2c2e; color: #f5f5f7; }
+body.light .mini-player { background: #f2f2f7; border-color: #e5e5ea; }
+body.light .mini-player-title { color: #636366; }
+body.light .mini-player-btn:hover { background: #e5e5ea; color: #1c1c1e; }
+
 .sidebar-footer {
   padding: 4px 4px 2px;
   display: flex;
@@ -1638,7 +1666,8 @@ body.light .history-title { color: #1c1c1e }
 .import-confirm-btn:disabled { opacity: .35; cursor: default }
 .import-confirm-btn:not(:disabled):hover { background: #0070d8 }
 
-#essentials-list.drag-target {
+#essentials-list.drag-target,
+#favorites-list.drag-target {
   outline: 1px dashed rgba(10, 132, 255, .35);
   border-radius: 7px;
   min-height: 32px

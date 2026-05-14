@@ -145,6 +145,20 @@
         <ul class="tab-list" id="archive-list"></ul>
       </div>
 
+      <!-- Mini player -->
+      <div class="mini-player" id="mini-player">
+        <img class="mini-player-favicon" id="mini-player-favicon" draggable="false">
+        <span class="mini-player-title" id="mini-player-title"></span>
+        <div class="mini-player-controls">
+          <button class="mini-player-btn" id="mini-player-pip" title="Picture-in-Picture">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="2" y="2" width="20" height="20" rx="2"/><rect x="12" y="13" width="9" height="7" rx="1" fill="currentColor" stroke="none"/></svg>
+          </button>
+          <button class="mini-player-btn" id="mini-player-go" title="Aller à l'onglet">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>
+
       <!-- Footer -->
       <div class="sidebar-footer">
 <button class="dl-toggle-btn" id="btn-downloads" title="Téléchargements">
@@ -172,6 +186,7 @@
 
       <webview id="webview" allowpopups></webview>
       <webview id="webview-private" partition="private:incognito" allowpopups style="display:none"></webview>
+      <webview id="webview-bg" allowpopups style="display:none"></webview>
 
       <!-- Barre de permission -->
       <div class="permission-bar" id="permission-bar">

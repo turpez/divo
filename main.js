@@ -354,14 +354,21 @@ app.whenReady().then(async () => {
             const skip = WEB_DARK_SKIP.some(h => hostname === h || hostname.endsWith('.' + h))
             if (!skip) {
               contents.insertCSS(WEB_DARK_CSS).catch(() => {})
-              // Annule le filtre si la page est déjà sombre (luminosité < 80)
               contents.executeJavaScript(`(function(){
-                const bg = window.getComputedStyle(document.documentElement).backgroundColor
-                const m = bg.match(/\\d+/g)
-                if (m && m.length >= 3) {
-                  const lum = (+m[0]*299 + +m[1]*587 + +m[2]*114) / 1000
-                  if (lum < 80) document.documentElement.style.filter = ''
+                function isDark() {
+                  for (const el of [document.body, document.documentElement]) {
+                    if (!el) continue
+                    const bg = window.getComputedStyle(el).backgroundColor
+                    const m = bg.match(/\\d+/g)
+                    if (!m || m.length < 3) continue
+                    const alpha = m[3] !== undefined ? +m[3] : 1
+                    if (alpha < 0.1) continue
+                    const lum = (+m[0]*299 + +m[1]*587 + +m[2]*114) / 1000
+                    if (lum < 80) { document.documentElement.style.filter = ''; return true }
+                  }
+                  return false
                 }
+                if (!isDark()) setTimeout(isDark, 1000)
               })()`).catch(() => {})
             }
           } catch {}
