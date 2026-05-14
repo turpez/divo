@@ -294,8 +294,13 @@ app.whenReady().then(async () => {
   })
 
   // ── Permissions
+  session.defaultSession.setPermissionCheckHandler((wc, permission) => {
+    if (permission === 'pointerLock' || permission === 'fullscreen') return true
+    return null
+  })
+
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
-    if (permission === 'fullscreen') { callback(true); return }
+    if (permission === 'fullscreen' || permission === 'pointerLock') { callback(true); return }
     const key = Date.now() + '-' + Math.random()
     pendingPerms.set(key, callback)
     const labels = {
