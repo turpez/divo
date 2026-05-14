@@ -192,7 +192,9 @@ async function checkForUpdate() {
     const rel = await res.json()
     const latest = (rel.tag_name || '').replace(/^v/, '')
     if (!latest || !semverGt(latest, app.getVersion())) return
-    const asset = rel.assets?.find(a => /Setup.*\.exe$/i.test(a.name))
+    const asset = process.platform === 'linux'
+      ? rel.assets?.find(a => /\.AppImage$/i.test(a.name))
+      : rel.assets?.find(a => /Setup.*\.exe$/i.test(a.name))
     mainWindow?.webContents.send('update-available', {
       version: latest,
       url: asset?.browser_download_url || rel.html_url
@@ -201,7 +203,9 @@ async function checkForUpdate() {
 }
 
 ipcMain.handle('install-update', async (_, url) => {
-  const tmpPath = path.join(app.getPath('temp'), 'Divo-Setup-update.exe')
+  const isLinux = process.platform === 'linux'
+  const fileName = isLinux ? 'Divo-update.AppImage' : 'Divo-Setup-update.exe'
+  const tmpPath = path.join(app.getPath('temp'), fileName)
   try {
     const res = await net.fetch(url)
     if (!res.ok) throw new Error('HTTP ' + res.status)
@@ -217,6 +221,7 @@ ipcMain.handle('install-update', async (_, url) => {
       if (total > 0) mainWindow?.webContents.send('update-progress', Math.round(received / total * 100))
     }
     await new Promise((resolve, reject) => writer.end(e => e ? reject(e) : resolve()))
+    if (isLinux) fs.chmodSync(tmpPath, 0o755)
     spawn(tmpPath, [], { detached: true, stdio: 'ignore' }).unref()
     app.quit()
     return { ok: true }
