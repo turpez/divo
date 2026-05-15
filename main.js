@@ -437,6 +437,7 @@ app.whenReady().then(async () => {
     const url = new URL(request.url)
     const file = url.hostname === 'newtab'   ? 'newtab.html'
                : url.hostname === 'settings' ? 'settings.html'
+               : url.hostname === 'dino'     ? 'dino.html'
                : null
     if (file) {
       const theme = config.theme || 'dark'

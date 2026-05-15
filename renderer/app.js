@@ -185,7 +185,8 @@ let currentLayout   = 'sidebar'
 function stripSlash(u) { return (u || '').replace(/\/+$/, '') }
 function isNewtab(url)   { const u = stripSlash(url); return !url || u === NEWTAB_URL || url.includes('newtab.html') }
 function isSettings(url) { const u = stripSlash(url); return u === SETTINGS_URL || url.includes('settings.html') }
-function isSpecial(url)  { return isNewtab(url) || isSettings(url) }
+function isDino(url)     { return (url || '').startsWith('divo://dino') || url.includes('dino.html') }
+function isSpecial(url)  { return isNewtab(url) || isSettings(url) || isDino(url) }
 function displayUrl(url) { return isSpecial(url) ? '' : url }
 
 function getActiveTabs()   { return tabs.filter(t => t.spaceId === activeSpaceId && !t.archived) }
@@ -575,6 +576,7 @@ function normalizeUrl(raw) {
   raw = raw.trim()
   if (!raw) return NEWTAB_URL
   if (raw === 'divo://settings') return SETTINGS_URL
+  if (raw === 'divo://dino')     return 'divo://dino'
   if (raw.startsWith('divo://') || raw.startsWith('file://') ||
     raw.startsWith('http://') || raw.startsWith('https://')) return raw
   // Protocoles custom (steam://, discord://, epic://, etc.) → passés tels quels
