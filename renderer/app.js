@@ -412,6 +412,15 @@ function wireWebviewEvents(el) {
         localStorage.setItem('divo-theme', ${JSON.stringify(currentTheme)});
         document.documentElement.setAttribute('data-theme', ${JSON.stringify(currentTheme)});
       `).catch(() => {})
+      // Focus le webview (nécessaire pour que le clavier soit capté),
+      // puis focus l'input à l'intérieur
+      el.focus()
+      try { window.bridge.focusWebview(el.getWebContentsId()) } catch {}
+      setTimeout(() => {
+        el.executeJavaScript(
+          'const s=document.getElementById("search");if(s){s.focus();s.select();}'
+        ).catch(() => {})
+      }, 80)
     }
     if (isSettings(url)) {
       el.executeJavaScript(`
