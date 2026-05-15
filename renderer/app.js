@@ -386,6 +386,11 @@ function wireWebviewEvents(el) {
 
   el.addEventListener('dom-ready', () => {
     el.__ready = true
+    // Empêcher les sites de détecter qu'ils sont en arrière-plan (évite YouTube qui se met en pause)
+    el.executeJavaScript(
+      'try{Object.defineProperty(document,"hidden",{get:()=>false,configurable:true});' +
+      'Object.defineProperty(document,"visibilityState",{get:()=>"visible",configurable:true})}catch(e){}'
+    ).catch(() => {})
     if (el === wv()) { webviewReady = true; updateNavButtons() }
   })
 
@@ -545,10 +550,15 @@ function wireWebviewEvents(el) {
     const key = el.__key
     const tab = tabs.find(t => t.id === key)
     if (tab) { tab.playing = false; renderTabs() }
-    if (key === mediaTabId) mediaTabId = null
-    if (key === mediaEssentialId) mediaEssentialId = null
-    if (el === wv()) { globalPlaying = false; updateMuteBtn() }
-    updateMiniPlayer()
+    // Ne cacher le mini lecteur que si c'est le webview actif qui a pausé.
+    // Les webviews en arrière-plan peuvent recevoir un media-paused dû au masquage CSS
+    // (YouTube détecte visibilitychange) — on garde le mini lecteur visible.
+    if (el === wv()) {
+      if (key === mediaTabId) mediaTabId = null
+      if (key === mediaEssentialId) mediaEssentialId = null
+      globalPlaying = false; updateMuteBtn()
+      updateMiniPlayer()
+    }
   })
 
   el.addEventListener('new-window', e => {
@@ -648,12 +658,14 @@ function updateMuteBtn() {
 }
 
 function updateMiniPlayer() {
-  const playing = tabs.find(t => t.playing)
-  if (!playing) { miniPlayer.classList.remove('visible'); return }
-  miniPlayerFav.src = playing.favicon || ''
-  miniPlayerFav.style.display = playing.favicon ? '' : 'none'
-  miniPlayerTitle.textContent = playing.title || 'En cours de lecture'
-  miniPlayer.dataset.tabId = playing.id
+  const key = mediaEssentialId || mediaTabId
+  if (!key) { miniPlayer.classList.remove('visible'); return }
+  const item = essentials.find(e => e.id === key) || tabs.find(t => t.id === key)
+  if (!item) { miniPlayer.classList.remove('visible'); return }
+  miniPlayerFav.src = item.favicon || ''
+  miniPlayerFav.style.display = item.favicon ? '' : 'none'
+  miniPlayerTitle.textContent = item.title || 'En cours de lecture'
+  miniPlayer.dataset.playKey = key
   miniPlayer.classList.add('visible')
 }
 
@@ -2087,8 +2099,10 @@ updateDismissBtn.addEventListener('click', () => {
 
 // ── Mini player controls
 document.getElementById('mini-player-pip').addEventListener('click', () => {
-  if (!webviewReady) return
-  wv().executeJavaScript(`(function(){
+  const key = miniPlayer.dataset.playKey
+  const playingWv = (key && pageWebviews.get(key)) || wv()
+  if (!playingWv?.__ready) return
+  playingWv.executeJavaScript(`(function(){
     try {
       const v = Array.from(document.querySelectorAll('video')).find(v => !v.paused) || document.querySelector('video')
       if (v && document.pictureInPictureEnabled) v.requestPictureInPicture().catch(function(){})
@@ -2096,8 +2110,10 @@ document.getElementById('mini-player-pip').addEventListener('click', () => {
   })()`, true).catch(() => {})
 })
 document.getElementById('mini-player-go').addEventListener('click', () => {
-  const id = miniPlayer.dataset.tabId
-  if (id) activateTab(id)
+  const key = miniPlayer.dataset.playKey
+  if (!key) return
+  if (essentials.find(e => e.id === key)) activateEssential(key)
+  else activateTab(key)
 })
 
 // ── Drag onglets → favoris

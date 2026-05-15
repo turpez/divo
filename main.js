@@ -365,12 +365,24 @@ ipcMain.handle('install-update', async (_, url) => {
     await new Promise((resolve, reject) => writer.end(e => e ? reject(e) : resolve()))
 
     if (isLinux) {
+      const currentAppImage = process.env.APPIMAGE
+      if (!currentAppImage) {
+        // APPIMAGE non défini — impossible de localiser le fichier .AppImage
+        // (process.execPath pointe sur le binaire interne, pas l'AppImage)
+        shell.openExternal(`https://github.com/${REPO}/releases/latest`)
+        return { ok: false, reason: 'no-appimage-path' }
+      }
       fs.chmodSync(tmpPath, 0o755)
-      // Remplace l'AppImage courante en place via un script shell
-      const currentAppImage = process.env.APPIMAGE || process.execPath
       const scriptPath = path.join(app.getPath('temp'), 'divo-update.sh')
-      fs.writeFileSync(scriptPath,
-        `#!/bin/bash\nsleep 1\ncp "${tmpPath}" "${currentAppImage}"\nchmod +x "${currentAppImage}"\n"${currentAppImage}" &\n`)
+      const logPath    = path.join(app.getPath('temp'), 'divo-update.log')
+      fs.writeFileSync(scriptPath, [
+        '#!/bin/bash',
+        `LOGFILE="${logPath}"`,
+        'sleep 1',
+        `cp "${tmpPath}" "${currentAppImage}" >> "$LOGFILE" 2>&1 || { echo "cp failed" >> "$LOGFILE"; exit 1; }`,
+        `chmod +x "${currentAppImage}" >> "$LOGFILE" 2>&1`,
+        `"${currentAppImage}" & disown`,
+      ].join('\n') + '\n')
       fs.chmodSync(scriptPath, 0o755)
       spawn(scriptPath, [], { detached: true, stdio: 'ignore', shell: false }).unref()
     } else {
@@ -454,21 +466,39 @@ app.whenReady().then(async () => {
   })
 
   // ── Permissions
+  // Accordées silencieusement (tous les navigateurs font pareil)
+  const PERM_AUTO_ALLOW = new Set([
+    'fullscreen', 'pointerLock',
+    'clipboard-sanitized-write', // écriture clipboard standard (pas de lecture)
+    'storage-access',            // accès storage pour iframes (flows de login)
+    'top-level-storage-access',  // idem en contexte top-level
+    'mediaKeySystem',            // DRM — nécessaire pour Netflix, Disney+, etc.
+    'screen-wake-lock',          // empêche la mise en veille pendant les vidéos
+    'midi',                      // MIDI basique (sans SysEx)
+  ])
+  // Refusées silencieusement (aucun site normal n'en a besoin)
+  const PERM_AUTO_DENY = new Set([
+    'serial', 'usb', 'hid', 'bluetooth', 'idle-detection',
+  ])
+
   session.defaultSession.setPermissionCheckHandler((wc, permission) => {
-    if (permission === 'pointerLock' || permission === 'fullscreen') return true
+    if (PERM_AUTO_ALLOW.has(permission)) return true
+    if (PERM_AUTO_DENY.has(permission))  return false
     return null
   })
 
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
-    if (permission === 'fullscreen' || permission === 'pointerLock') { callback(true); return }
+    if (PERM_AUTO_ALLOW.has(permission)) { callback(true);  return }
+    if (PERM_AUTO_DENY.has(permission))  { callback(false); return }
     const key = Date.now() + '-' + Math.random()
     pendingPerms.set(key, callback)
     const labels = {
-      media:           'Caméra et/ou Microphone',
-      geolocation:     'Localisation',
-      notifications:   'Notifications',
-      'clipboard-read': 'Presse-papiers (lecture)',
-      'clipboard-sanitized-write': 'Presse-papiers (écriture)',
+      media:              'Caméra et/ou Microphone',
+      geolocation:        'Localisation',
+      notifications:      'Notifications',
+      'clipboard-read':   'Presse-papiers (lecture)',
+      midiSysex:          'MIDI (SysEx)',
+      'window-management':'Gestion multi-écrans',
     }
     mainWindow.webContents.send('permission-request', {
       key,

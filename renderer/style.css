@@ -593,26 +593,34 @@ body.private-active .nav-row .nav-btn:hover:not(:disabled) {
   gap: 8px;
   padding: 8px 10px;
   margin: 4px 6px;
-  background: #1c1c1e;
+  background: #252527;
   border-radius: 10px;
-  border: 1px solid #2c2c2e;
+  border: 1px solid #3a3a3c;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35);
   min-width: 0;
+  animation: mini-player-in .18s ease;
+}
+@keyframes mini-player-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 .mini-player.visible { display: flex; }
-.mini-player-favicon { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
-.mini-player-title { flex: 1; font-size: 11px; color: #aeaeb2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mini-player-favicon { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; }
+.mini-player-title { flex: 1; font-size: 11.5px; color: #e8e8ed; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-weight: 500; }
 .mini-player-controls { display: flex; gap: 2px; flex-shrink: 0; }
 .mini-player-btn {
-  width: 22px; height: 22px;
+  width: 24px; height: 24px;
   border: none; background: none;
-  border-radius: 5px; cursor: pointer;
-  color: #636366;
+  border-radius: 6px; cursor: pointer;
+  color: #8e8e93;
   display: flex; align-items: center; justify-content: center;
+  transition: background .1s, color .1s;
 }
-.mini-player-btn:hover { background: #2c2c2e; color: #f5f5f7; }
-body.light .mini-player { background: #f2f2f7; border-color: #e5e5ea; }
-body.light .mini-player-title { color: #636366; }
-body.light .mini-player-btn:hover { background: #e5e5ea; color: #1c1c1e; }
+.mini-player-btn:hover { background: #3a3a3c; color: #f5f5f7; }
+body.light .mini-player { background: #e8e8ed; border-color: #d1d1d6; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+body.light .mini-player-title { color: #1c1c1e; }
+body.light .mini-player-btn { color: #636366; }
+body.light .mini-player-btn:hover { background: #d1d1d6; color: #1c1c1e; }
 
 .sidebar-footer {
   padding: 4px 4px 2px;
