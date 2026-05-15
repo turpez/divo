@@ -553,7 +553,16 @@ function wireWebviewEvents(el) {
     const tab = tabs.find(t => t.id === key)
     if (tab && !tab.playing) { tab.playing = true; renderTabs() }
     if (el === wv()) { globalPlaying = true; updateMuteBtn() }
-    updateMiniPlayer()
+
+    // Afficher le mini lecteur seulement pour un vrai lecteur :
+    // — aucun <video> dans la page → audio pur (Spotify, podcasts…) → OK
+    // — <video> présent mais tous petits (pubs, previews, thumbnails) → ignorer
+    // — <video> avec au moins un élément ≥ 200×100 px → OK
+    el.executeJavaScript(`(function(){
+      const vids = Array.from(document.querySelectorAll('video')).filter(v => !v.paused && !v.ended)
+      if (!vids.length) return true
+      return vids.some(v => { const r = v.getBoundingClientRect(); return r.width >= 200 && r.height >= 100 })
+    })()`).then(show => { if (show) updateMiniPlayer() }).catch(() => updateMiniPlayer())
   })
 
   el.addEventListener('media-paused', () => {

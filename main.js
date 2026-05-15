@@ -110,42 +110,81 @@ const GENERIC_AD_CSS = `
 // ── YouTube ad blocker
 const YT_AD_CSS = `
   .ytp-ad-overlay-container, .ytp-ad-image-overlay, .ytp-ad-text-overlay,
+  .ytp-ad-player-overlay, .ytp-ad-module, .ytp-ad-player-overlay-layout,
   ytd-action-companion-ad-renderer, ytd-ad-slot-renderer,
   ytd-promoted-sparkles-web-renderer, ytd-promoted-video-renderer,
   ytd-search-pyv-renderer, ytd-display-ad-renderer,
   ytd-promoted-sparkles-text-search-renderer, ytd-statement-banner-renderer,
-  #masthead-ad, .ytd-banner-promo-renderer { display: none !important; }
+  ytd-rich-item-renderer:has(ytd-ad-slot-renderer),
+  #player-ads, #masthead-ad, .ytd-banner-promo-renderer { display: none !important; }
 `
 const YT_AD_JS = `(function(){
   if (window.__dv) return; window.__dv = 1;
   function skip() {
-    const btn = document.querySelector('.ytp-skip-ad-button,.ytp-ad-skip-button,.ytp-ad-skip-button-modern');
+    // Bouton "Passer l'annonce" — sélecteurs 2024/2025
+    const btn = document.querySelector(
+      '.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern, ' +
+      '.ytp-ad-skip-button-slot button, button[class*="skip"]'
+    );
     if (btn) { btn.click(); return; }
+
     const vid = document.querySelector('video');
-    const ad  = document.querySelector('.ytp-ad-player-overlay-instream-info,.ytp-ad-simple-ad-badge');
-    if (vid && ad) { vid.muted = true; vid.playbackRate = 16; if (vid.duration) vid.currentTime = vid.duration - 0.1; }
-    else if (vid && vid.playbackRate !== 1) { vid.playbackRate = 1; vid.muted = false; }
+    if (!vid) return;
+
+    // Détection via .ad-showing sur <html> (la plus fiable, stable depuis 2020)
+    const isAd =
+      document.documentElement.classList.contains('ad-showing') ||
+      document.documentElement.classList.contains('ad-interrupting') ||
+      !!document.querySelector(
+        '.ytp-ad-player-overlay-instream-info, .ytp-ad-simple-ad-badge, ' +
+        '.ytp-ad-preview-container, .ytp-ad-player-overlay-layout'
+      );
+
+    if (isAd) {
+      if (!vid.muted)              vid.muted = true;
+      if (vid.playbackRate !== 16) vid.playbackRate = 16;
+      if (isFinite(vid.duration) && vid.duration > 0)
+        vid.currentTime = vid.duration - 0.01;
+    } else if (vid.playbackRate !== 1) {
+      vid.playbackRate = 1;
+      vid.muted = false;
+    }
   }
-  new MutationObserver(skip).observe(document.documentElement, { childList: true, subtree: true });
+
+  // Observe changements DOM + attributs de classe (pour .ad-showing)
+  new MutationObserver(skip).observe(document.documentElement, {
+    childList: true, subtree: true,
+    attributes: true, attributeFilter: ['class']
+  });
+
+  // YouTube SPA : chaque navigation vidéo déclenche cet événement
+  document.addEventListener('yt-navigate-finish', skip);
   skip();
 })()`
 
 // ── Twitch ad blocker
 const TWITCH_AD_CSS = `
   .video-ad-label, .tw-c-text-overlay, .ad-banner, .tw-ad,
-  div[data-a-target="video-ad-countdown"], .stream-chat-header ~ .tw-pd-1,
+  div[data-a-target="video-ad-countdown"], div[data-a-target="stream-ad-badge"],
   .player-ad-overlay, .tw-popover__bubble[style*="opacity: 1"] { display: none !important; }
 `
 const TWITCH_AD_JS = `(function(){
   if (window.__dv_tw) return; window.__dv_tw = 1;
   let adMuted = false;
   function checkAd() {
-    const adBanner = document.querySelector('.video-ad-label, [data-a-target="video-ad-countdown"]');
+    const isAd = !!(
+      document.querySelector(
+        '.video-ad-label, [data-a-target="video-ad-countdown"], ' +
+        '[data-a-target="stream-ad-badge"], .player-ad-overlay'
+      )
+    );
     const vid = document.querySelector('video');
-    if (adBanner && vid && !adMuted) { vid.muted = true; adMuted = true; }
-    else if (!adBanner && vid && adMuted) { vid.muted = false; adMuted = false; }
+    if (!vid) return;
+    if (isAd && !adMuted)  { vid.muted = true;  adMuted = true; }
+    if (!isAd && adMuted)  { vid.muted = false; adMuted = false; }
   }
-  setInterval(checkAd, 1000);
+  setInterval(checkAd, 500);
+  new MutationObserver(checkAd).observe(document.documentElement, { childList: true, subtree: true });
 })()`
 
 // ── Web dark mode dynamique (inspiré Dark Reader)
