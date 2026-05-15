@@ -363,8 +363,21 @@ ipcMain.handle('install-update', async (_, url) => {
       if (total > 0) mainWindow?.webContents.send('update-progress', Math.round(received / total * 100))
     }
     await new Promise((resolve, reject) => writer.end(e => e ? reject(e) : resolve()))
-    if (isLinux) fs.chmodSync(tmpPath, 0o755)
-    spawn(tmpPath, [], { detached: true, stdio: 'ignore' }).unref()
+
+    if (isLinux) {
+      fs.chmodSync(tmpPath, 0o755)
+      // Remplace l'AppImage courante en place via un script shell
+      const currentAppImage = process.env.APPIMAGE || process.execPath
+      const scriptPath = path.join(app.getPath('temp'), 'divo-update.sh')
+      fs.writeFileSync(scriptPath,
+        `#!/bin/bash\nsleep 1\ncp "${tmpPath}" "${currentAppImage}"\nchmod +x "${currentAppImage}"\n"${currentAppImage}" &\n`)
+      fs.chmodSync(scriptPath, 0o755)
+      spawn(scriptPath, [], { detached: true, stdio: 'ignore', shell: false }).unref()
+    } else {
+      // /S = mode silencieux NSIS — mise à jour sans assistant, sans réinstall complète
+      spawn(tmpPath, ['/S'], { detached: true, stdio: 'ignore' }).unref()
+    }
+
     app.quit()
     return { ok: true }
   } catch (e) {
