@@ -690,17 +690,23 @@ app.whenReady().then(async () => {
   })
 
   // ── Téléchargements
+  const safeFilename = raw =>
+    path.basename(String(raw || 'download'))
+      .replace(/[\x00-\x1f<>"'/\\|?*]/g, '_')
+      .slice(0, 200) || 'download'
+
   session.defaultSession.on('will-download', (_, item) => {
     const id = Date.now()
     const dlDir = config.downloadPath || app.getPath('downloads')
-    item.setSavePath(path.join(dlDir, path.basename(item.getFilename())))
+    const filename = safeFilename(item.getFilename())
+    item.setSavePath(path.join(dlDir, filename))
     downloadItems.set(id, item)
-    mainWindow.webContents.send('dl-start', { id, filename: item.getFilename(), total: item.getTotalBytes() })
+    mainWindow.webContents.send('dl-start', { id, filename, total: item.getTotalBytes() })
     item.on('updated', (_, state) => {
       mainWindow.webContents.send('dl-update', { id, state, received: item.getReceivedBytes(), total: item.getTotalBytes() })
     })
     item.once('done', (_, state) => {
-      mainWindow.webContents.send('dl-done', { id, state, filename: item.getFilename(), savePath: item.getSavePath() })
+      mainWindow.webContents.send('dl-done', { id, state, filename, savePath: item.getSavePath() })
       downloadItems.delete(id)
     })
   })

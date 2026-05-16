@@ -1535,9 +1535,10 @@ function renderDownloads() {
     const done = dl.state === 'completed'
     const fail = dl.state === 'cancelled' || dl.state === 'interrupted'
     const el   = document.createElement('div'); el.className = 'dl-item'; el.dataset.id = id
+    const fname = escapeHtml(dl.filename)
     el.innerHTML = `
       <div class="dl-item-top">
-        <span class="dl-name" title="${dl.filename}">${dl.filename}</span>
+        <span class="dl-name" title="${fname}">${fname}</span>
         <span class="dl-status ${done ? 'done' : fail ? 'error' : ''}">${done ? 'Terminé' : fail ? 'Annulé' : pct + '%'}</span>
       </div>
       ${!done && !fail ? `<div class="dl-progress-track"><div class="dl-progress-fill" style="width:${pct}%"></div></div>` : ''}
