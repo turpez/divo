@@ -4,7 +4,7 @@ const fs   = require('fs')
 const { spawn } = require('child_process')
 
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'divo', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+  { scheme: 'divo', privileges: { standard: true, supportFetchAPI: true } }
 ])
 
 app.commandLine.appendSwitch('disable-renderer-backgrounding')
