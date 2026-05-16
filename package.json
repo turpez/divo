@@ -31,19 +31,18 @@
         { "target": "nsis",     "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "protocols": [
+        { "name": "Divo Browser", "schemes": ["http", "https"] }
+      ],
+      "fileAssociations": [
+        { "ext": "html",  "name": "Divo HTML Document", "description": "Ouvrir avec Divo" },
+        { "ext": "htm",   "name": "Divo HTML Document", "description": "Ouvrir avec Divo" },
+        { "ext": "xhtml", "name": "Divo HTML Document", "description": "Ouvrir avec Divo" },
+        { "ext": "shtml", "name": "Divo HTML Document", "description": "Ouvrir avec Divo" },
+        { "ext": "xht",   "name": "Divo HTML Document", "description": "Ouvrir avec Divo" }
+      ]
     },
-    "protocols": [
-      { "name": "Divo Browser", "schemes": ["http", "https"] }
-    ],
-    "fileAssociations": [
-      {
-        "ext": ["html", "htm", "xhtml", "shtml", "xht"],
-        "name": "Divo HTML Document",
-        "description": "Ouvrir avec Divo",
-        "role": "Editor"
-      }
-    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
