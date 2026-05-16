@@ -682,8 +682,13 @@ function createWindow() {
   mainWindow.webContents.on('will-attach-webview', (e, webPreferences) => {
     delete webPreferences.preload
     delete webPreferences.preloadURL
-    webPreferences.nodeIntegration = false
-    webPreferences.contextIsolation = true
+    webPreferences.nodeIntegration             = false
+    webPreferences.nodeIntegrationInSubFrames  = false
+    webPreferences.contextIsolation            = true
+    webPreferences.sandbox                     = true
+    webPreferences.webSecurity                 = true
+    webPreferences.allowRunningInsecureContent = false
+    webPreferences.experimentalFeatures        = false
   })
 }
 
