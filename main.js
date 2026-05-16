@@ -181,6 +181,26 @@ function initBlocklist() {
   if (needsRefresh) refreshFilterLists()
 }
 
+function setupCsp() {
+  const CSP_INTERNAL =
+    "default-src 'none'; " +
+    "img-src https: data: blob:; " +
+    "style-src 'self' 'unsafe-inline'; " +
+    "script-src 'self' 'unsafe-inline'; " +
+    "connect-src 'none'; " +
+    "frame-src https://chromedino.com; " +
+    "object-src 'none'; " +
+    "base-uri 'none'"
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ['divo://*/*'] },
+    (details, callback) => {
+      const headers = { ...details.responseHeaders }
+      headers['content-security-policy'] = [CSP_INTERNAL]
+      callback({ responseHeaders: headers })
+    }
+  )
+}
+
 function setupAdblocker() {
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['<all_urls>'] }, (details, callback) => {
     if (!config.adblock || !blockedDomains.size || details.resourceType === 'mainFrame') {
@@ -670,6 +690,7 @@ function createWindow() {
 app.whenReady().then(async () => {
   initBlocklist()
   setupAdblocker()
+  setupCsp()
 
   // ── Protocole divo://
   protocol.handle('divo', (request) => {
