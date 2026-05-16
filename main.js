@@ -141,13 +141,20 @@ const YT_AD_JS = `(function(){
       );
 
     if (isAd) {
-      if (!vid.muted)              vid.muted = true;
-      if (vid.playbackRate !== 16) vid.playbackRate = 16;
+      // Sauvegarder la vitesse et le mute de l'utilisateur avant d'intervenir
+      if (vid.playbackRate !== 16) {
+        if (window.__dvRate === undefined) window.__dvRate = vid.playbackRate;
+        vid.playbackRate = 16;
+      }
+      if (!vid.muted) { window.__dvWasMuted = false; vid.muted = true; }
       if (isFinite(vid.duration) && vid.duration > 0)
         vid.currentTime = vid.duration - 0.01;
-    } else if (vid.playbackRate !== 1) {
-      vid.playbackRate = 1;
-      vid.muted = false;
+    } else if (window.__dvRate !== undefined) {
+      // Restaurer la vitesse choisie par l'utilisateur (pas forcer 1x)
+      vid.playbackRate = window.__dvRate;
+      window.__dvRate = undefined;
+      if (!window.__dvWasMuted) vid.muted = false;
+      window.__dvWasMuted = undefined;
     }
   }
 
