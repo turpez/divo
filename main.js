@@ -192,15 +192,54 @@ function dynamicDark() {
   'use strict'
   if (document.getElementById('__dv_dm')) return
 
-  // Bail si le site est déjà sombre
-  const bodyEl = document.body || document.documentElement
-  if (bodyEl) {
-    const bg = window.getComputedStyle(bodyEl).backgroundColor
-    const m  = bg.match(/\d+/g)
-    if (m && m.length >= 3 && (+m[0]*299 + +m[1]*587 + +m[2]*114) / 255000 < 0.25) return
+  const root = document.documentElement
+
+  // ── Bail si le site gère déjà son propre thème sombre ──────────
+  function selfIsDark() {
+    // Classes framework : Tailwind (.dark), Bootstrap 5 (data-bs-theme), etc.
+    if (root.classList.contains('dark') || root.classList.contains('dark-mode') ||
+        root.classList.contains('night-mode')) return true
+    const attrs = ['data-theme','data-color-scheme','data-bs-theme','data-mode']
+    for (const a of attrs) {
+      const v = root.getAttribute(a)
+      if (v && v.toLowerCase().includes('dark')) return true
+    }
+    return false
   }
+  if (selfIsDark()) return
+
+  // Bail via meta color-scheme
   const metaCS = document.querySelector('meta[name="color-scheme"]')
   if (metaCS && metaCS.content && metaCS.content.includes('dark')) return
+
+  // Bail si fond réel (non transparent) déjà sombre — vérifier html ET body
+  function bgLum(el) {
+    if (!el) return null
+    const bg = window.getComputedStyle(el).backgroundColor
+    const m = bg.match(/\d+/g)
+    if (!m || m.length < 3) return null
+    const alpha = m.length >= 4 ? +m[3] : 1
+    if (alpha < 0.15) return null  // transparent → on ne peut pas conclure
+    return (+m[0]*299 + +m[1]*587 + +m[2]*114) / 255000
+  }
+  const lums = [bgLum(root), bgLum(document.body)].filter(l => l !== null)
+  if (lums.length && Math.min(...lums) < 0.30) return
+
+  // Bail si le site a un support natif @media (prefers-color-scheme: dark) significatif
+  try {
+    let nativeDark = 0
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of (sheet.cssRules || [])) {
+          if (rule.type === 4 && rule.conditionText &&
+              rule.conditionText.includes('prefers-color-scheme') &&
+              rule.conditionText.includes('dark') &&
+              rule.cssRules && rule.cssRules.length > 2) nativeDark++
+        }
+      } catch {}
+    }
+    if (nativeDark >= 2) return
+  } catch {}
 
   // ── Utilitaires couleur ─────────────────────────────────────
   function parse(str) {
@@ -309,12 +348,18 @@ function dynamicDark() {
 
   function apply() { style.textContent=buildCSS() }
   apply()
+  window.__dvApply = apply  // exposé pour re-trigger SPA
 
-  // Re-scan quand de nouveaux styles sont chargés
+  // Re-scan quand de nouveaux styles sont injectés dans <head>
   let t
-  new MutationObserver(()=>{clearTimeout(t);t=setTimeout(apply,300)}).observe(document.head,{childList:true})
-  setTimeout(apply,600)
-  setTimeout(apply,2000)
+  new MutationObserver(()=>{clearTimeout(t);t=setTimeout(apply,150)}).observe(document.head,{childList:true})
+  setTimeout(apply,250)
+  setTimeout(apply,800)
+
+  // Si le site active son propre dark mode après coup → supprimer notre overlay
+  new MutationObserver(()=>{
+    if(selfIsDark()){const s=document.getElementById('__dv_dm');if(s)s.remove()}
+  }).observe(root,{attributes:true,attributeFilter:['class','data-theme','data-color-scheme','data-bs-theme','data-mode']})
 }
 const WEB_DARK_JS = '(' + dynamicDark.toString() + ')()'
 // Sites ayant déjà un thème sombre natif — on n'applique pas le filtre
@@ -348,6 +393,32 @@ const WEB_DARK_SKIP = [
   'artstation.com',
   'unsplash.com',
   'imgur.com',
+  'tiktok.com',
+  'linkedin.com',
+  'slack.com',
+  'whatsapp.com',
+  'telegram.org',
+  'messenger.com',
+  'teams.microsoft.com',
+  'office.com',
+  'microsoft.com',
+  'apple.com',
+  'cursor.com',
+  'claude.ai',
+  'chat.openai.com',
+  'openai.com',
+  'anthropic.com',
+  'tailwindcss.com',
+  'shadcn.com',
+  'supabase.com',
+  'planetscale.com',
+  'railway.app',
+  'neon.tech',
+  'trello.com',
+  'asana.com',
+  'monday.com',
+  'airtable.com',
+  'miro.com',
 ]
 
 // ── Auto-update
@@ -594,6 +665,20 @@ app.whenReady().then(async () => {
             if (!skip) contents.executeJavaScript(WEB_DARK_JS).catch(() => {})
           } catch {}
         }
+      })
+
+      // Navigation SPA : re-déclencher le dark mode si la page change sans rechargement
+      contents.on('did-navigate-in-page', (_, url, isMainFrame) => {
+        if (!isMainFrame || !config.webDarkMode || !url || url.startsWith('divo:')) return
+        try {
+          const hostname = new URL(url).hostname.replace(/^www\./, '')
+          const skip = WEB_DARK_SKIP.some(h => hostname === h || hostname.endsWith('.' + h))
+          if (!skip) {
+            contents.executeJavaScript(
+              'clearTimeout(window.__dvT);window.__dvT=setTimeout(()=>{if(window.__dvApply)window.__dvApply()},300)'
+            ).catch(() => {})
+          }
+        } catch {}
       })
       contents.setWindowOpenHandler(({ url }) => {
         try {
