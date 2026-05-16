@@ -186,10 +186,15 @@ let currentLayout   = 'sidebar'
 // ============================================================
 
 function stripSlash(u) { return (u || '').replace(/\/+$/, '') }
-function isNewtab(url)   { const u = stripSlash(url); return !url || u === NEWTAB_URL || url.includes('newtab.html') }
-function isSettings(url) { const u = stripSlash(url); return u === SETTINGS_URL || url.includes('settings.html') }
-function isDino(url)     { return (url || '').startsWith('divo://dino') || url.includes('dino.html') }
-function isSpecial(url)  { return isNewtab(url) || isSettings(url) || isDino(url) }
+// Comparaison stricte sur le protocole divo: — les includes() sur .html étaient bypassables
+// par n'importe quelle page externe hébergée à une URL contenant "newtab.html" etc.
+function isSpecial(url) {
+  try { const u = new URL(url); return u.protocol === 'divo:' && ['newtab','settings','dino'].includes(u.hostname) }
+  catch { return !url }
+}
+function isNewtab(url)   { try { const u = new URL(url); return u.protocol === 'divo:' && u.hostname === 'newtab'   } catch { return !url } }
+function isSettings(url) { try { const u = new URL(url); return u.protocol === 'divo:' && u.hostname === 'settings' } catch { return false } }
+function isDino(url)     { try { const u = new URL(url); return u.protocol === 'divo:' && u.hostname === 'dino'     } catch { return false } }
 function displayUrl(url) { return isSpecial(url) ? '' : url }
 
 function getActiveTabs()   { return tabs.filter(t => t.spaceId === activeSpaceId && !t.archived) }
