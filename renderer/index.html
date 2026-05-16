@@ -194,6 +194,14 @@
       <webview id="webview-private" partition="private:incognito" allowpopups style="display:none"></webview>
       <webview id="webview-bg" allowpopups style="display:none"></webview>
 
+      <!-- Bannière navigateur par défaut -->
+      <div class="default-browser-bar" id="default-browser-bar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        <span>Divo n'est pas votre navigateur par défaut</span>
+        <button class="perm-btn allow" id="default-browser-set">Définir par défaut</button>
+        <button class="perm-dismiss"   id="default-browser-dismiss">✕</button>
+      </div>
+
       <!-- Barre de permission -->
       <div class="permission-bar" id="permission-bar">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#febc2e" stroke-width="2" stroke-linecap="round" style="flex-shrink:0">

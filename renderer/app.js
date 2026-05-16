@@ -13,10 +13,13 @@ const SETTINGS_URL = window.bridge.settingsUrl
 const webview          = document.getElementById('webview')
 const webviewPrivate   = document.getElementById('webview-private')
 const webviewBg        = document.getElementById('webview-bg')
-const updateBar        = document.getElementById('update-bar')
-const updateMsg        = document.getElementById('update-msg')
-const updateInstallBtn = document.getElementById('update-install-btn')
-const updateDismissBtn = document.getElementById('update-dismiss-btn')
+const updateBar           = document.getElementById('update-bar')
+const updateMsg           = document.getElementById('update-msg')
+const updateInstallBtn    = document.getElementById('update-install-btn')
+const updateDismissBtn    = document.getElementById('update-dismiss-btn')
+const defaultBrowserBar   = document.getElementById('default-browser-bar')
+const defaultBrowserSet   = document.getElementById('default-browser-set')
+const defaultBrowserDismiss = document.getElementById('default-browser-dismiss')
 const miniPlayer       = document.getElementById('mini-player')
 const miniPlayerFav    = document.getElementById('mini-player-favicon')
 const miniPlayerTitle  = document.getElementById('mini-player-title')
@@ -462,6 +465,7 @@ function wireWebviewEvents(el) {
         const aa  = localStorage.getItem('divo-auto-archive')  || 'off'
         const ab  = await window.bridge.adblockStatus()
         const wdm = await window.bridge.webDarkModeStatus()
+        const isDefault = await window.bridge.isDefaultBrowser()
         el.executeJavaScript(`
           document.getElementById('search-engine').value    = ${JSON.stringify(se)};
           document.getElementById('homepage').value         = ${JSON.stringify(hp)};
@@ -470,6 +474,19 @@ function wireWebviewEvents(el) {
           document.getElementById('adblock-toggle').checked = ${!!ab};
           const wdt = document.getElementById('web-dark-toggle');
           if (wdt) wdt.checked = ${!!wdm};
+          const defBtn = document.getElementById('default-browser-btn');
+          const defStatus = document.getElementById('default-browser-status');
+          if (defBtn && defStatus) {
+            if (${!!isDefault}) {
+              defStatus.textContent = 'Divo est votre navigateur par défaut';
+              defStatus.style.color = '#34c759';
+              defBtn.disabled = true;
+            } else {
+              defStatus.textContent = 'Divo n\\'est pas le navigateur par défaut';
+              defStatus.style.color = '';
+              defBtn.disabled = false;
+            }
+          }
         `).catch(() => {})
       }, 300)
     }
@@ -495,10 +512,11 @@ function wireWebviewEvents(el) {
     if (e.title.startsWith('divo-action:')) {
       if (isSpecial(currentUrl)) {
         const action = e.title.replace('divo-action:', '')
-        if (action.startsWith('adblock:'))        window.bridge.adblockToggle(action.endsWith('true'))
-        if (action.startsWith('theme:'))           applyTheme(action.replace('theme:', ''))
-        if (action.startsWith('layout:'))          applyLayout(action.replace('layout:', ''))
-        if (action.startsWith('web-dark:'))        window.bridge.webDarkModeToggle(action.endsWith('true'))
+        if (action.startsWith('adblock:'))         window.bridge.adblockToggle(action.endsWith('true'))
+        if (action.startsWith('theme:'))            applyTheme(action.replace('theme:', ''))
+        if (action.startsWith('layout:'))           applyLayout(action.replace('layout:', ''))
+        if (action.startsWith('web-dark:'))         window.bridge.webDarkModeToggle(action.endsWith('true'))
+        if (action === 'set-default-browser')       window.bridge.setDefaultBrowser()
         if (action.startsWith('pick-download-path')) {
           window.bridge.pickDownloadPath().then(newPath => {
             if (!newPath || !el.__ready) return
@@ -2115,6 +2133,19 @@ updateInstallBtn.addEventListener('click', async () => {
 
 updateDismissBtn.addEventListener('click', () => {
   updateBar.classList.remove('visible')
+})
+
+// ── Navigateur par défaut
+window.bridge.onNotDefaultBrowser(() => {
+  if (!sessionStorage.getItem('default-dismissed')) defaultBrowserBar.classList.add('visible')
+})
+defaultBrowserSet.addEventListener('click', () => {
+  window.bridge.setDefaultBrowser()
+  defaultBrowserBar.classList.remove('visible')
+})
+defaultBrowserDismiss.addEventListener('click', () => {
+  sessionStorage.setItem('default-dismissed', '1')
+  defaultBrowserBar.classList.remove('visible')
 })
 
 // ── Mini player controls

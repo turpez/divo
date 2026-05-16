@@ -130,6 +130,22 @@
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.5' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     }
     html[data-theme="light"] .toggle-slider { background: #d1d1d6; }
+
+    .default-btn {
+      background: #0a84ff;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: filter .15s;
+    }
+    .default-btn:hover { filter: brightness(1.12); }
+    .default-btn:disabled { background: #3a3a3c; color: #636366; cursor: default; filter: none; }
+    html[data-theme="light"] .default-btn:disabled { background: #d1d1d6; color: #8e8e93; }
   </style>
 </head>
 <body>
@@ -242,6 +258,19 @@
     </div>
 
     <div class="section">
+      <div class="section-title">Navigateur par défaut</div>
+      <div class="card">
+        <div class="setting-row" style="border-bottom:none">
+          <div>
+            <div class="setting-label">Navigateur par défaut Windows</div>
+            <div class="setting-desc" id="default-browser-status">Vérification…</div>
+          </div>
+          <button class="default-btn" id="default-browser-btn">Définir par défaut</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
       <div class="section-title">Confidentialité</div>
       <div class="card">
         <div class="setting-row">
@@ -273,7 +302,7 @@
       </div>
     </div>
 
-    <p class="version-text">Divo 1.0.22 — fait avec ❤️</p>
+    <p class="version-text">Divo 1.0.23 — fait avec ❤️</p>
   </div>
 
   <script>
@@ -312,6 +341,9 @@
     })
     document.getElementById('web-dark-toggle').addEventListener('change', function() {
       document.title = 'divo-action:web-dark:' + this.checked
+    })
+    document.getElementById('default-browser-btn').addEventListener('click', function() {
+      document.title = 'divo-action:set-default-browser'
     })
   </script>
 </body>

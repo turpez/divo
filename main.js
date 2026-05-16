@@ -830,6 +830,13 @@ app.whenReady().then(async () => {
   createWindow()
   setTimeout(checkForUpdate, 10000)
   setInterval(checkForUpdate, UPDATE_INTERVAL)
+
+  // Notifier le renderer si Divo n'est pas navigateur par défaut
+  setTimeout(() => {
+    if (mainWindow && !app.isDefaultProtocolClient('https')) {
+      mainWindow.webContents.send('not-default-browser')
+    }
+  }, 4000)
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
@@ -856,6 +863,11 @@ ipcMain.on('answer-permission',  (_, key, granted) => {
 // ── Adblock IPC
 ipcMain.handle('adblock-status', () => config.adblock)
 ipcMain.handle('adblock-toggle', (_, enabled) => { config.adblock = !!enabled; saveConfig(); return config.adblock })
+ipcMain.handle('is-default-browser', () => app.isDefaultProtocolClient('https') || app.isDefaultProtocolClient('http'))
+ipcMain.handle('set-default-browser', () => {
+  app.setAsDefaultProtocolClient('http')
+  app.setAsDefaultProtocolClient('https')
+})
 ipcMain.handle('set-theme', (_, theme) => { config.theme = theme; saveConfig() })
 
 // ── Téléchargements IPC

@@ -746,6 +746,22 @@ body.light .update-bar { background: #e6f9ec; border-bottom-color: #34c759; colo
 body.light .update-dismiss-btn { color: #1a7a2e; }
 
 /* ── PERMISSION BAR ── */
+.default-browser-bar {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: #0d2a47;
+  border-bottom: 1px solid #1a4a7a;
+  font-size: 12.5px;
+  color: #e8e8ed;
+  flex-shrink: 0;
+  z-index: 65;
+}
+.default-browser-bar.visible { display: flex; }
+.default-browser-bar span { flex: 1; }
+body.light .default-browser-bar { background: #e8f0fe; border-bottom-color: #4a90d9; color: #1a3a6e; }
+
 .permission-bar {
   display: none;
   align-items: center;

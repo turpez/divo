@@ -1,6 +1,6 @@
 {
   "name": "divo",
-  "version": "1.0.22",
+  "version": "1.0.23",
   "description": "Divo Browser",
   "author": "Divh",
   "main": "main.js",
@@ -33,6 +33,17 @@
       ],
       "icon": "assets/icon.png"
     },
+    "protocols": [
+      { "name": "Divo Browser", "schemes": ["http", "https"] }
+    ],
+    "fileAssociations": [
+      {
+        "ext": ["html", "htm", "xhtml", "shtml", "xht"],
+        "name": "Divo HTML Document",
+        "description": "Ouvrir avec Divo",
+        "role": "Editor"
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
