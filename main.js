@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, protocol, webContents, shell, session, dial
 const path = require('path')
 const fs   = require('fs')
 const { spawn } = require('child_process')
+const crypto = require('crypto')
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'divo', privileges: { standard: true, supportFetchAPI: true } }
@@ -625,25 +626,35 @@ ipcMain.handle('install-update', async () => {
 
     if (isLinux) {
       const currentAppImage = process.env.APPIMAGE
-      if (!currentAppImage) {
-        // APPIMAGE non défini — impossible de localiser le fichier .AppImage
-        // (process.execPath pointe sur le binaire interne, pas l'AppImage)
+      // Valider que APPIMAGE est un chemin absolu vers un fichier régulier (pas un symlink)
+      if (!currentAppImage || !path.isAbsolute(currentAppImage)) {
         shell.openExternal(`https://github.com/${REPO}/releases/latest`)
         return { ok: false, reason: 'no-appimage-path' }
       }
+      try {
+        if (!fs.statSync(currentAppImage).isFile()) throw new Error()
+      } catch {
+        shell.openExternal(`https://github.com/${REPO}/releases/latest`)
+        return { ok: false, reason: 'invalid-appimage-path' }
+      }
+
       fs.chmodSync(tmpPath, 0o755)
-      const scriptPath = path.join(app.getPath('temp'), 'divo-update.sh')
+
+      // Nom imprédictible + flag 'wx' pour refuser de suivre un symlink pré-existant
+      // Les valeurs tmpPath/currentAppImage passent en paramètres positionnels ($1/$2)
+      // et ne sont jamais interpolées dans le corps du script → pas d'injection shell
+      const scriptPath = path.join(app.getPath('temp'), `divo-update-${crypto.randomBytes(8).toString('hex')}.sh`)
       const logPath    = path.join(app.getPath('temp'), 'divo-update.log')
-      fs.writeFileSync(scriptPath, [
-        '#!/bin/bash',
-        `LOGFILE="${logPath}"`,
+      const script = [
+        '#!/bin/sh',
+        `LOGFILE='${logPath.replace(/'/g, "'\\''")}'`,
         'sleep 1',
-        `cp "${tmpPath}" "${currentAppImage}" >> "$LOGFILE" 2>&1 || { echo "cp failed" >> "$LOGFILE"; exit 1; }`,
-        `chmod +x "${currentAppImage}" >> "$LOGFILE" 2>&1`,
-        `"${currentAppImage}" & disown`,
-      ].join('\n') + '\n')
-      fs.chmodSync(scriptPath, 0o755)
-      spawn(scriptPath, [], { detached: true, stdio: 'ignore', shell: false }).unref()
+        'cp "$1" "$2" >> "$LOGFILE" 2>&1 || { echo "cp failed" >> "$LOGFILE"; exit 1; }',
+        'chmod +x "$2" >> "$LOGFILE" 2>&1',
+        '"$2" & disown',
+      ].join('\n') + '\n'
+      fs.writeFileSync(scriptPath, script, { flag: 'wx', mode: 0o700 })
+      spawn(scriptPath, [tmpPath, currentAppImage], { detached: true, stdio: 'ignore', shell: false }).unref()
     } else {
       // /S = mode silencieux NSIS — mise à jour sans assistant, sans réinstall complète
       spawn(tmpPath, ['/S'], { detached: true, stdio: 'ignore' }).unref()
