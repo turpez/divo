@@ -694,9 +694,13 @@ function createWindow() {
   const WEBVIEW_ALLOWED_PARTITIONS = /^(persist:divo|private:incognito)$/
   mainWindow.webContents.on('will-attach-webview', (e, webPreferences, params) => {
     // Vérifier que l'URL initiale utilise un scheme autorisé (bloque file://, data:, etc.)
-    try {
-      if (!WEBVIEW_ALLOWED_PROTOS.has(new URL(params.src).protocol)) { e.preventDefault(); return }
-    } catch { e.preventDefault(); return }
+    // Un src vide est autorisé : la webview est d'abord attachée sans src puis naviguée
+    // via will-navigate — c'est le fonctionnement normal du pool d'onglets.
+    if (params.src) {
+      try {
+        if (!WEBVIEW_ALLOWED_PROTOS.has(new URL(params.src).protocol)) { e.preventDefault(); return }
+      } catch { e.preventDefault(); return }
+    }
 
     // Forcer la partition à une valeur attendue (ignore l'attribut HTML partition="...")
     if (!WEBVIEW_ALLOWED_PARTITIONS.test(params.partition || '')) {
