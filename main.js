@@ -831,6 +831,13 @@ app.whenReady().then(async () => {
           mainWindow.webContents.send('webview-shortcut', { mod, shift: input.shift, alt: input.alt, code: input.code })
         }
       })
+
+      // Boutons souris 4 (retour) et 5 (avant) dans le webview
+      contents.on('input-event', (_, input) => {
+        if (input.type !== 'mouseUp') return
+        if (input.button === 'back'    && contents.canGoBack())    contents.goBack()
+        if (input.button === 'forward' && contents.canGoForward()) contents.goForward()
+      })
       contents.on('did-finish-load', () => {
         const url = contents.getURL()
         if (!url || url.startsWith('chrome') || url.startsWith('arc') || url.startsWith('file')) return
