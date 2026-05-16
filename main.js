@@ -972,7 +972,18 @@ ipcMain.handle('import-bookmarks-html', async () => {
 })
 
 // ── Import bookmarks Chrome/Edge/Brave (auto-détection)
-ipcMain.handle('import-chrome-bookmarks', () => {
+ipcMain.handle('import-chrome-bookmarks', async () => {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Importer les favoris',
+    message: 'Divo va lire vos favoris Chrome / Edge / Brave / Chromium installés sur cette machine.',
+    detail: 'Aucune donnée ne quitte votre ordinateur.',
+    buttons: ['Annuler', 'Importer'],
+    defaultId: 1,
+    cancelId: 0,
+  })
+  if (response !== 1) return []
+
   const browsers = [
     { name: 'Chrome',   base: path.join(process.env.LOCALAPPDATA || '', 'Google',         'Chrome',        'User Data') },
     { name: 'Edge',     base: path.join(process.env.LOCALAPPDATA || '', 'Microsoft',      'Edge',          'User Data') },
