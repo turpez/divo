@@ -34,43 +34,151 @@ let config = { adblock: true, webDarkMode: false }
 try { Object.assign(config, JSON.parse(fs.readFileSync(configPath, 'utf-8'))) } catch {}
 function saveConfig() { try { fs.writeFileSync(configPath, JSON.stringify(config)) } catch (e) { console.error('saveConfig error', e) } }
 
-// ── Adblocker
-const blocklistPath = path.join(app.getPath('userData'), 'blocklist_v2.txt')
-const BLOCKLIST_URL = 'https://small.oisd.nl/domainswild'
-const BLOCKLIST_TTL = 7 * 24 * 60 * 60 * 1000
-let blockedDomains = new Set()
+// ── Adblocker (uBlock Origin-style)
+const BL_DIR = app.getPath('userData')
+const BL_VER = 'v5'
+const BL_DOMAINS_FILE  = path.join(BL_DIR, `bl_${BL_VER}_domains.txt`)
+const BL_COSMETIC_FILE = path.join(BL_DIR, `bl_${BL_VER}_cosmetic.json`)
+const BL_TTL = 7 * 24 * 60 * 60 * 1000
 
-function parseBlocklist(text) {
-  const set = new Set()
+let blockedDomains     = new Set()
+let cosmeticGenericCSS = ''           // sélecteurs CSS génériques (sans déclaration)
+const cosmeticByDomain = new Map()    // "example.com" → ["#ad", ".banner", …]
+
+// Filtre les pseudo-classes uBlock/ABP non natives (navigateur ne les comprend pas)
+function isNativeSelector(sel) {
+  const ext = [':has-text(', ':upward(', ':xpath(', ':matches-css(', ':-abp-',
+               ':if(', ':if-not(', '+js(', ':watch-attr(', ':min-text-length(',
+               ':matches-path(', ':others(']
+  return !ext.some(s => sel.includes(s))
+}
+
+function addDomain(d) {
+  const clean = d.trim().toLowerCase().replace(/^\*\./, '')
+  if (clean.includes('.') && clean !== 'localhost' && !/^\d+\.\d+\.\d+/.test(clean))
+    blockedDomains.add(clean)
+}
+
+// Parse liste de domaines (format oisd / hosts)
+function parseDomainText(text) {
   for (const line of text.split('\n')) {
     const t = line.trim()
     if (!t || t[0] === '#' || t[0] === '!') continue
-    const parts = t.split(/\s+/)
-    const domain = parts[parts.length - 1].toLowerCase().replace(/^\*\./, '')
-    if (domain.includes('.') && domain !== 'localhost' && !/^\d+\.\d+\.\d+/.test(domain)) set.add(domain)
+    addDomain(t.split(/\s+/).pop())
   }
-  blockedDomains = set
 }
 
-async function refreshBlocklist() {
+// Parse liste ABP/EasyList → domaines réseau + règles cosmétiques
+function parseAbpList(text, domainSet, genericSels, domainSels) {
+  for (const rawLine of text.split('\n')) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('!') || line.startsWith('[')) continue
+    // Ignore exceptions, extended CSS, scriptlets
+    if (line.startsWith('@@') || line.includes('#?#') || line.includes('#@#') || line.includes('#$#')) continue
+
+    // Cosmétique générique : ##sélecteur
+    if (line.startsWith('##')) {
+      const sel = line.slice(2).trim()
+      if (sel && isNativeSelector(sel)) genericSels.push(sel)
+      continue
+    }
+
+    // Cosmétique par domaine : domaines##sélecteur
+    const hh = line.indexOf('##')
+    if (hh > 0) {
+      const sel = line.slice(hh + 2).trim()
+      if (!sel || !isNativeSelector(sel)) continue
+      for (const raw of line.slice(0, hh).split(',')) {
+        const d = raw.trim().toLowerCase().replace(/^www\./, '')
+        if (!d || d.startsWith('~') || d.includes('/') || !d.includes('.')) continue
+        const arr = domainSels.get(d) || []; arr.push(sel); domainSels.set(d, arr)
+      }
+      continue
+    }
+
+    // Règle réseau : extraire domaine depuis ||domaine^
+    let rule = line
+    if (line.includes('$')) rule = line.slice(0, line.lastIndexOf('$'))
+    if (rule.startsWith('||')) {
+      const inner = rule.slice(2).split(/[\^\/\?]/)[0].toLowerCase()
+      if (inner && inner.includes('.') && /^[a-z0-9._-]+$/.test(inner)) domainSet.add(inner)
+    }
+  }
+}
+
+// Renvoie le CSS cosmétique à injecter pour un hostname donné
+function getPageCosmeticCSS(hostname) {
+  const host  = hostname.replace(/^www\./, '').toLowerCase()
+  const parts = host.split('.')
+  const sels  = []
+  for (let i = 0; i < parts.length - 1; i++) {
+    const rules = cosmeticByDomain.get(parts.slice(i).join('.'))
+    if (rules) sels.push(...rules)
+  }
+  return sels.length ? sels.join(',\n') + ' { display: none !important; }' : ''
+}
+
+async function refreshFilterLists() {
   try {
-    const res = await net.fetch(BLOCKLIST_URL)
-    if (!res.ok) return
-    const text = await res.text()
-    fs.writeFileSync(blocklistPath, text, 'utf-8')
-    parseBlocklist(text)
-  } catch (e) { console.error('refreshBlocklist error', e) }
+    const newDomains    = new Set()
+    const newGeneric    = []
+    const newByDomain   = new Map()
+
+    // Téléchargement en parallèle
+    const [domRes, elRes] = await Promise.allSettled([
+      net.fetch('https://big.oisd.nl/domainswild'),
+      net.fetch('https://easylist.to/easylist/easylist.txt')
+    ])
+
+    if (domRes.status === 'fulfilled' && domRes.value.ok) {
+      const text = await domRes.value.text()
+      for (const line of text.split('\n')) {
+        const t = line.trim()
+        if (!t || t[0] === '#' || t[0] === '!') continue
+        const d = t.split(/\s+/).pop().toLowerCase().replace(/^\*\./, '')
+        if (d.includes('.') && d !== 'localhost' && !/^\d+\.\d+\.\d+/.test(d)) newDomains.add(d)
+      }
+    }
+
+    if (elRes.status === 'fulfilled' && elRes.value.ok) {
+      parseAbpList(await elRes.value.text(), newDomains, newGeneric, newByDomain)
+    }
+
+    // Sauvegarde
+    fs.writeFileSync(BL_DOMAINS_FILE, [...newDomains].join('\n'), 'utf-8')
+    fs.writeFileSync(BL_COSMETIC_FILE, JSON.stringify({
+      generic:  newGeneric.slice(0, 6000),
+      byDomain: Object.fromEntries(newByDomain)
+    }), 'utf-8')
+
+    // Application immédiate
+    blockedDomains     = newDomains
+    cosmeticGenericCSS = newGeneric.slice(0, 6000).join(',\n')
+    cosmeticByDomain.clear()
+    for (const [k, v] of newByDomain) cosmeticByDomain.set(k, v)
+
+    console.log(`[adblock] ${blockedDomains.size} domaines, ${cosmeticByDomain.size} règles cosmétiques domaine`)
+  } catch (e) { console.error('[adblock] refresh error', e) }
 }
 
 function initBlocklist() {
-  if (fs.existsSync(blocklistPath)) {
+  // Chargement rapide depuis le cache
+  if (fs.existsSync(BL_DOMAINS_FILE)) {
     try {
-      parseBlocklist(fs.readFileSync(blocklistPath, 'utf-8'))
-      if (Date.now() - fs.statSync(blocklistPath).mtimeMs > BLOCKLIST_TTL) refreshBlocklist()
-      return
-    } catch (e) { console.error('initBlocklist error', e) }
+      blockedDomains = new Set(fs.readFileSync(BL_DOMAINS_FILE, 'utf-8').split('\n').filter(Boolean))
+    } catch {}
   }
-  refreshBlocklist()
+  if (fs.existsSync(BL_COSMETIC_FILE)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(BL_COSMETIC_FILE, 'utf-8'))
+      cosmeticGenericCSS = (data.generic || []).join(',\n')
+      for (const [k, v] of Object.entries(data.byDomain || {})) cosmeticByDomain.set(k, v)
+    } catch {}
+  }
+
+  const needsRefresh = !fs.existsSync(BL_DOMAINS_FILE) || !fs.existsSync(BL_COSMETIC_FILE) ||
+    Date.now() - fs.statSync(BL_DOMAINS_FILE).mtimeMs > BL_TTL
+  if (needsRefresh) refreshFilterLists()
 }
 
 function setupAdblocker() {
@@ -79,7 +187,7 @@ function setupAdblocker() {
       callback({}); return
     }
     const scheme = details.url.split(':')[0]
-    if (scheme === 'arc' || scheme === 'file' || scheme === 'chrome-extension') {
+    if (scheme === 'divo' || scheme === 'file' || scheme === 'chrome-extension') {
       callback({}); return
     }
     try {
@@ -654,7 +762,17 @@ app.whenReady().then(async () => {
         if (!url || url.startsWith('chrome') || url.startsWith('arc') || url.startsWith('file')) return
 
         if (config.adblock) {
+          // CSS génériques (curatés + EasyList)
           contents.insertCSS(GENERIC_AD_CSS).catch(() => {})
+          if (cosmeticGenericCSS) {
+            contents.insertCSS(cosmeticGenericCSS + ' { display: none !important; }').catch(() => {})
+          }
+          // CSS cosmétiques spécifiques au domaine
+          try {
+            const domCSS = getPageCosmeticCSS(new URL(url).hostname)
+            if (domCSS) contents.insertCSS(domCSS).catch(() => {})
+          } catch {}
+          // Sites spécifiques
           if (url.includes('youtube.com') || url.includes('youtu.be')) {
             contents.insertCSS(YT_AD_CSS).catch(() => {})
             contents.executeJavaScript(YT_AD_JS).catch(() => {})
