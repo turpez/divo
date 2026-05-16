@@ -81,6 +81,16 @@ function escapeHtml(s) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
+// Valide une URL de favicon — n'autorise que http/https/data pour éviter les injections
+// via src="javascript:..." ou src='" onerror="...' dans les innerHTML
+function safeFavicon(u) {
+  if (!u) return ''
+  try {
+    const p = new URL(u).protocol
+    if (p !== 'http:' && p !== 'https:' && p !== 'data:') return ''
+    return escapeHtml(u)
+  } catch { return '' }
+}
 
 // SEC-001 — retourne le webview actif (pool normal ou privé)
 function wv() {
@@ -333,8 +343,8 @@ function renderTopTabs() {
     const li = document.createElement('li')
     li.className = 'top-tab' + (t.id === activeTabId ? ' active' : '') + (t.unloaded ? ' unloaded' : '')
     li.dataset.id = t.id
-    const fav = t.favicon
-      ? `<img class="top-tab-favicon" src="${t.favicon}" draggable="false" onerror="this.style.display='none'">`
+    const fav = safeFavicon(t.favicon)
+      ? `<img class="top-tab-favicon" src="${safeFavicon(t.favicon)}" draggable="false" onerror="this.style.display='none'">`
       : `<div class="top-tab-fav-placeholder"></div>`
     li.innerHTML = `${fav}<span class="top-tab-title">${escapeHtml(t.title) || 'Nouvel onglet'}</span><button class="top-tab-close" data-close="${t.id}">✕</button>`
     frag.appendChild(li)
@@ -682,7 +692,7 @@ function updateTitlebarFavicon() {
   const favicon = activeEssentialId
     ? essentials.find(e => e.id === activeEssentialId)?.favicon
     : tabs.find(t => t.id === activeTabId)?.favicon
-  if (favicon && !activeTabIsPrivate()) { el.src = favicon; el.classList.add('shown') }
+  if (favicon && !activeTabIsPrivate()) { el.src = safeFavicon(favicon); el.classList.add('shown') }
   else { el.src = ''; el.classList.remove('shown') }
 }
 
@@ -705,8 +715,8 @@ function updateMiniPlayer() {
   if (!key) { miniPlayer.classList.remove('visible'); return }
   const item = essentials.find(e => e.id === key) || tabs.find(t => t.id === key)
   if (!item) { miniPlayer.classList.remove('visible'); return }
-  miniPlayerFav.src = item.favicon || ''
-  miniPlayerFav.style.display = item.favicon ? '' : 'none'
+  miniPlayerFav.src = safeFavicon(item.favicon)
+  miniPlayerFav.style.display = safeFavicon(item.favicon) ? '' : 'none'
   miniPlayerTitle.textContent = item.title || 'En cours de lecture'
   miniPlayer.dataset.playKey = key
   miniPlayer.classList.add('visible')
@@ -944,8 +954,8 @@ function buildFavRow(fav, indented) {
   li.className = 'tab-item' + (indented ? ' fav-indented' : '')
   li.dataset.id = fav.id
   li.dataset.favType = 'url'
-  const faviconHtml = fav.favicon
-    ? `<img class="tab-favicon" src="${fav.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
+  const faviconHtml = safeFavicon(fav.favicon)
+    ? `<img class="tab-favicon" src="${safeFavicon(fav.favicon)}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
     : `<div class="tab-favicon-placeholder"></div>`
   li.innerHTML = `${faviconHtml}<span class="tab-title">${escapeHtml(fav.title)}</span><button class="tab-close" data-remove-fav="${fav.id}">✕</button>`
   return li
@@ -1286,8 +1296,8 @@ function renderArchived() {
     const li = document.createElement('li')
     li.className = 'tab-item archived-tab'
     li.dataset.id = t.id
-    const faviconHtml = t.favicon
-      ? `<img class="tab-favicon" src="${t.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
+    const faviconHtml = safeFavicon(t.favicon)
+      ? `<img class="tab-favicon" src="${safeFavicon(t.favicon)}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
       : `<div class="tab-favicon-placeholder"></div>`
     li.innerHTML = `${faviconHtml}<span class="tab-title">${escapeHtml(t.title)}</span><button class="tab-close" data-del="${t.id}">✕</button>`
     li.addEventListener('click', e => { if (!e.target.closest('[data-del]')) unarchiveTab(t.id) })
@@ -1334,7 +1344,7 @@ function renderEssentials() {
     li.className = 'tab-item' + (activeEssentialId === e.id ? ' active' : '')
     li.dataset.id = e.id; li.draggable = true
     li.innerHTML = `
-      <img class="tab-favicon" src="${e.favicon || ''}" loading="lazy" draggable="false" onerror="this.style.display='none'">
+      ${safeFavicon(e.favicon) ? `<img class="tab-favicon" src="${safeFavicon(e.favicon)}" loading="lazy" draggable="false" onerror="this.style.display='none'">` : '<div class="tab-favicon-placeholder"></div>'}
       <span class="tab-title">${escapeHtml(e.title)}</span>
       <button class="tab-close" data-unload-ess="${e.id}">✕</button>
     `
@@ -1352,8 +1362,8 @@ function buildTabItem(t) {
   li.dataset.id = t.id; li.draggable = true
   const faviconHtml = t.private
     ? `<div class="tab-favicon-private">${ICON_LOCK}</div>`
-    : t.favicon
-      ? `<img class="tab-favicon" src="${t.favicon}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
+    : safeFavicon(t.favicon)
+      ? `<img class="tab-favicon" src="${safeFavicon(t.favicon)}" loading="lazy" draggable="false" onerror="this.style.display='none'">`
       : `<div class="tab-favicon-placeholder"></div>`
   li.innerHTML = `
     ${faviconHtml}
@@ -1494,7 +1504,7 @@ function renderHistory() {
     }
     const el = document.createElement('div'); el.className = 'history-item'
     el.innerHTML = `
-      ${item.favicon ? `<img src="${item.favicon}" onerror="this.style.display='none'">` : '<div style="width:15px"></div>'}
+      ${safeFavicon(item.favicon) ? `<img src="${safeFavicon(item.favicon)}" onerror="this.style.display='none'">` : '<div style="width:15px"></div>'}
       <div class="history-item-info">
         <div class="history-item-title">${escapeHtml(item.title)}</div>
         <div class="history-item-url">${escapeHtml(item.url)}</div>
