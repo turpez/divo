@@ -689,8 +689,21 @@ function createWindow() {
   // SEC-006 — empêche la BrowserWindow principale de naviguer vers des URLs externes
   mainWindow.webContents.on('will-navigate', (e) => e.preventDefault())
 
-  // SEC-009 — valide les webviews attachées
-  mainWindow.webContents.on('will-attach-webview', (e, webPreferences) => {
+  // SEC-009/110 — valide les webviews attachées (src, partition, webPreferences)
+  const WEBVIEW_ALLOWED_PROTOS = new Set(['http:', 'https:', 'divo:', 'about:'])
+  const WEBVIEW_ALLOWED_PARTITIONS = /^(persist:divo|private:incognito)$/
+  mainWindow.webContents.on('will-attach-webview', (e, webPreferences, params) => {
+    // Vérifier que l'URL initiale utilise un scheme autorisé (bloque file://, data:, etc.)
+    try {
+      if (!WEBVIEW_ALLOWED_PROTOS.has(new URL(params.src).protocol)) { e.preventDefault(); return }
+    } catch { e.preventDefault(); return }
+
+    // Forcer la partition à une valeur attendue (ignore l'attribut HTML partition="...")
+    if (!WEBVIEW_ALLOWED_PARTITIONS.test(params.partition || '')) {
+      params.partition = 'persist:divo'
+    }
+
+    // Figer toutes les webPreferences (écrase tout attribut webpreferences="...")
     delete webPreferences.preload
     delete webPreferences.preloadURL
     webPreferences.nodeIntegration             = false
