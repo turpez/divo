@@ -884,9 +884,20 @@ ipcMain.on('answer-permission',  (_, key, granted) => {
 ipcMain.handle('adblock-status', () => config.adblock)
 ipcMain.handle('adblock-toggle', (_, enabled) => { config.adblock = !!enabled; saveConfig(); return config.adblock })
 ipcMain.handle('is-default-browser', () => app.isDefaultProtocolClient('https') || app.isDefaultProtocolClient('http'))
-ipcMain.handle('set-default-browser', () => {
+ipcMain.handle('set-default-browser', async () => {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'question',
+    title: 'Navigateur par défaut',
+    message: 'Faire de Divo votre navigateur par défaut ?',
+    detail: "Divo gérera les liens http et https ouverts depuis d'autres applications.",
+    buttons: ['Annuler', 'Définir'],
+    defaultId: 1,
+    cancelId: 0,
+  })
+  if (response !== 1) return false
   app.setAsDefaultProtocolClient('http')
   app.setAsDefaultProtocolClient('https')
+  return true
 })
 ipcMain.handle('set-theme', (_, theme) => { config.theme = theme; saveConfig() })
 

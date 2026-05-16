@@ -531,7 +531,6 @@ function wireWebviewEvents(el) {
         if (action.startsWith('theme:'))            applyTheme(action.replace('theme:', ''))
         if (action.startsWith('layout:'))           applyLayout(action.replace('layout:', ''))
         if (action.startsWith('web-dark:'))         window.bridge.webDarkModeToggle(action.endsWith('true'))
-        if (action === 'set-default-browser')       window.bridge.setDefaultBrowser()
         if (action.startsWith('pick-download-path')) {
           window.bridge.pickDownloadPath().then(newPath => {
             if (!newPath || !el.__ready) return
@@ -543,6 +542,12 @@ function wireWebviewEvents(el) {
           })
         }
       }
+      return
+    }
+    // Action réservée exclusivement à la page settings (garde plus strict que isSpecial)
+    // La vraie protection contre l'abus est le dialog.showMessageBox côté main
+    if (e.title === 'divo-settings-action:set-default-browser') {
+      if (isSettings(currentUrl)) window.bridge.setDefaultBrowser()
       return
     }
     if (e.title.startsWith('divo-settings:')) {
