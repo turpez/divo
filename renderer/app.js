@@ -2107,10 +2107,10 @@ if (activeItem) {
 }
 
 // ── Auto-update
-let pendingUpdateUrl = null
+let updateAvailable = false
 
-window.bridge.onUpdateAvailable(({ version, url }) => {
-  pendingUpdateUrl = url
+window.bridge.onUpdateAvailable(({ version }) => {
+  updateAvailable = true
   updateMsg.textContent = `Divo ${version} disponible`
   updateBar.classList.add('visible')
 })
@@ -2120,10 +2120,10 @@ window.bridge.onUpdateProgress(pct => {
 })
 
 updateInstallBtn.addEventListener('click', async () => {
-  if (!pendingUpdateUrl) return
+  if (!updateAvailable) return
   updateInstallBtn.disabled = true
   updateInstallBtn.textContent = '0%'
-  const result = await window.bridge.installUpdate(pendingUpdateUrl)
+  const result = await window.bridge.installUpdate()
   if (!result?.ok) {
     updateInstallBtn.disabled = false
     updateInstallBtn.textContent = 'Installer'

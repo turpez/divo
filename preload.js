@@ -29,7 +29,7 @@ contextBridge.exposeInMainWorld('bridge', {
   onWebviewShortcut:    (cb) => ipcRenderer.on('webview-shortcut',  (_, d) => cb(d)),
   onUpdateAvailable:    (cb) => ipcRenderer.on('update-available',    (_, d) => cb(d)),
   onUpdateProgress:     (cb) => ipcRenderer.on('update-progress',     (_, p) => cb(p)),
-  installUpdate:        (url) => ipcRenderer.invoke('install-update',  url),
+  installUpdate:        ()    => ipcRenderer.invoke('install-update'),
   isDefaultBrowser:     ()    => ipcRenderer.invoke('is-default-browser'),
   setDefaultBrowser:    ()    => ipcRenderer.invoke('set-default-browser'),
   onNotDefaultBrowser:  (cb)  => ipcRenderer.on('not-default-browser', () => cb()),
