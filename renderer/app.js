@@ -91,6 +91,15 @@ function safeFavicon(u) {
     return escapeHtml(u)
   } catch { return '' }
 }
+// Valide les URLs chargées depuis localStorage — bloque javascript:, data:, chrome:, etc.
+const SAFE_TAB_PROTOS = new Set(['http:', 'https:', 'divo:', 'file:'])
+function safeTabUrl(u) {
+  if (!u) return NEWTAB_URL
+  try {
+    if (SAFE_TAB_PROTOS.has(new URL(u).protocol)) return u
+  } catch {}
+  return NEWTAB_URL
+}
 
 // SEC-001 — retourne le webview actif (pool normal ou privé)
 function wv() {
@@ -280,17 +289,28 @@ function loadState() {
 
     // Essentials
     const se = localStorage.getItem('arc-essentials')
-    essentials = se ? JSON.parse(se) : structuredClone(DEFAULT_ESSENTIALS)
+    essentials = se ? JSON.parse(se).map(e => ({
+      ...e,
+      url:     safeTabUrl(e.url),
+      favicon: safeFavicon(e.favicon) || null,
+    })) : structuredClone(DEFAULT_ESSENTIALS)
 
     // Favorites — migration: ajoute spaceId si absent
     const sf = localStorage.getItem('arc-favorites')
-    favorites = sf ? JSON.parse(sf).map(f => ({ ...f, spaceId: f.spaceId || spaces[0].id })) : []
+    favorites = sf ? JSON.parse(sf).map(f => ({
+      ...f,
+      url:     safeTabUrl(f.url),
+      favicon: safeFavicon(f.favicon) || null,
+      spaceId: f.spaceId || spaces[0].id,
+    })) : []
 
     // Tabs — migrate legacy tabs without spaceId / lastUsed
     const st = localStorage.getItem('arc-tabs')
     const parsed = st ? JSON.parse(st) : []
     tabs = parsed.map(t => ({
       ...t,
+      url:      safeTabUrl(t.url),
+      favicon:  safeFavicon(t.favicon) || null,
       spaceId:  t.spaceId  || spaces[0].id,
       lastUsed: t.lastUsed || Date.now(),
       archived: t.archived || false,
